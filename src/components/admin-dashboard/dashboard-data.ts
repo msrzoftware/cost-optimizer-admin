@@ -1,124 +1,110 @@
-﻿export const navigationItems = [
-  { label: "Dashboard", href: "#dashboard", icon: "LayoutDashboard" },
-  { label: "Assessments", href: "#assessments", icon: "ClipboardCheck" },
-  { label: "Search", href: "#search", icon: "Search" },
-  { label: "Data Dictionary", href: "#dictionary", icon: "BookOpen" },
-  { label: "Experts", href: "#experts", icon: "Users" },
-  { label: "Team", href: "#team", icon: "UserRound" },
-  { label: "Trash", href: "#trash", icon: "Trash2" },
-  { label: "Settings", href: "#settings", icon: "Settings" },
-] as const;
-
-export const automationLevels = [
+export const dashboardStats = [
   {
-    level: 1,
-    label: "Manual",
-    description: "Fully manual, people-driven process",
-    color: "#EF4444",
+    label: "Total Assessments",
+    value: "12",
+    helper: "9 active in pipeline",
+    tone: "neutral",
   },
   {
-    level: 2,
-    label: "Mostly Manual",
-    description: "Some tools used but majority is manual work",
-    color: "#F97316",
+    label: "Avg. Digitization Index",
+    value: "29%",
+    helper: "Across all submitted orgs",
+    tone: "blue",
   },
   {
-    level: 3,
-    label: "Partial",
-    description: "Mix of manual and automated steps",
-    color: "#EAB308",
+    label: "Total Cost Analysed",
+    value: "$2.9M",
+    helper: "Combined annual process cost",
+    tone: "neutral",
   },
   {
-    level: 4,
-    label: "Mostly Automated",
-    description: "Largely automated with minimal human intervention",
-    color: "#22C55E",
-  },
-  {
-    level: 5,
-    label: "Fully Automated",
-    description: "End-to-end automation, minimal human touchpoints",
-    color: "#10B981",
+    label: "Total Potential Savings",
+    value: "$1.2M",
+    helper: "1 deals closed-won",
+    tone: "green",
   },
 ] as const;
 
-export const processTiers = [
-  { label: "Must-Have", slug: "must-have", color: "#10B981" },
-  { label: "Good-to-Have", slug: "good-to-have", color: "#3B82F6" },
-  { label: "Nice to Have", slug: "tried-legacy", color: "#A3A3A3" },
-  { label: "Future Enhancement", slug: "future-enhancement", color: "#8B5CF6" },
+export type PipelineStatus = {
+  count: number;
+  key?: string;
+  label: string;
+  tone: "gray" | "blueLight" | "blue" | "green" | "red";
+};
+
+export type RecentAssessment = {
+  company: string;
+  contact: string;
+  cost: string;
+  id: string;
+  industry: string;
+  savings: string;
+  score: string;
+  status: string;
+  statusKey?: string;
+};
+
+export const pipelineStatuses: PipelineStatus[] = [
+  { key: "draft", label: "Draft", count: 0, tone: "gray" },
+  { key: "processes-in-progress", label: "Processes In Progress", count: 0, tone: "gray" },
+  { key: "due-diligence", label: "Due Diligence", count: 0, tone: "blueLight" },
+  { key: "results-ready", label: "Results Ready", count: 0, tone: "blueLight" },
+  { key: "expert-booked", label: "Expert Booked", count: 0, tone: "blue" },
+  { key: "closed-won", label: "Closed Won", count: 0, tone: "green" },
+  { key: "closed-lost", label: "Closed Lost", count: 0, tone: "red" },
+];
+
+export const industryBreakdown = [
+  { label: "Retail", count: 3 },
+  { label: "Banking", count: 2 },
+  { label: "Healthcare", count: 2 },
+  { label: "Public Sector", count: 2 },
+  { label: "Insurance", count: 1 },
+  { label: "Real Estate", count: 1 },
+  { label: "Automotive", count: 1 },
 ] as const;
 
-export const benchmarkMetrics = [
-  { value: "18%", label: "Bottom Quartile" },
-  { value: "38%", label: "Median" },
-  { value: "65%", label: "Top Quartile" },
-  { value: "78%", label: "Best-in-Class" },
+export const assessmentTrend = [
+  { month: "Jan", value: 0 },
+  { month: "Feb", value: 0 },
+  { month: "Mar", value: 1 },
+  { month: "Apr", value: 1 },
+  { month: "May", value: 3 },
+  { month: "Jun", value: 5 },
 ] as const;
 
-export const industries = [
-  "Banking",
-  "Healthcare",
-  "Insurance",
-  "Retail",
-  "Public Sector",
-  "Real Estate",
-  "Automotive",
+export const stageWeights = [
+  { label: "Draft", weight: "5% weight" },
+  { label: "Processes In Progress", weight: "20% weight" },
+  { label: "Due Diligence", weight: "40% weight" },
+  { label: "Results Ready", weight: "60% weight" },
+  { label: "Expert Booked", weight: "80% weight" },
 ] as const;
 
-export const domains = [
-  "Customer Experience",
-  "Human Resources",
-  "Finance & Accounting",
-  "Sales",
-  "Marketing",
-  "IT Operations",
-  "Admin & Facilities",
-  "BPO / Shared Services",
+export const pipelineConversion = [
+  { label: "Draft", percent: 100, deals: "11 deals" },
+  { label: "Processes In Progress", percent: 91, deals: "10 deals" },
+  { label: "Due Diligence", percent: 73, deals: "8 deals" },
+  { label: "Results Ready", percent: 55, deals: "6 deals" },
+  { label: "Expert Booked", percent: 27, deals: "3 deals" },
+  { label: "Closed Won", percent: 9, deals: "1 deals" },
 ] as const;
 
-export const processRows = [
-  { code: "CX-01", name: "Customer Onboarding", domain: "CX", tier: "Must-Have" },
-  { code: "CX-02", name: "Ticket Triage & Routing", domain: "CX", tier: "Must-Have" },
-  { code: "CX-03", name: "Proactive Outreach", domain: "CX", tier: "Future Enhancement" },
-  { code: "CX-04", name: "Complaint Resolution", domain: "CX", tier: "Must-Have" },
-  { code: "CX-05", name: "NPS / CSAT Surveys", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-06", name: "Knowledge Base Maintenance", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-08", name: "Live Chat Support", domain: "CX", tier: "Must-Have" },
-  { code: "CX-09", name: "Voice / IVR Support", domain: "CX", tier: "Must-Have" },
-  { code: "CX-10", name: "Account Updates & Maintenance", domain: "CX", tier: "Must-Have" },
-  { code: "CX-11", name: "Loyalty Programme Management", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-12", name: "Returns & Refunds Processing", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-14", name: "Win-Back Campaigns", domain: "CX", tier: "Future Enhancement" },
-  { code: "CX-15", name: "Case Documentation", domain: "CX", tier: "Must-Have" },
-  { code: "CX-20", name: "VoC Analysis & Reporting", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-22", name: "SLA Monitoring", domain: "CX", tier: "Must-Have" },
-  { code: "CX-26", name: "Cross-sell / Upsell Support", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-28", name: "Social Media Support", domain: "CX", tier: "Good-to-Have" },
-  { code: "CX-31", name: "Fraud & Risk Flagging", domain: "CX", tier: "Must-Have" },
-  { code: "CX-34", name: "Regulatory Reporting", domain: "CX", tier: "Must-Have" },
-  { code: "CX-35", name: "Quality Assurance Reviews", domain: "CX", tier: "Good-to-Have" },
+export const companySizeDistribution = [
+  { label: "5,001-20,000\nemployees", value: 2 },
+  { label: "1,001-5,000\nemployees", value: 6 },
+  { label: "201-1,000\nemployees", value: 1 },
+  { label: "51-200\nemployees", value: 1 },
+  { label: "20,000+\nemployees", value: 2 },
 ] as const;
 
-export const technologyRows = [
-  { name: "Salesforce Service Cloud", category: "Salesforce - CRM / Support" },
-  { name: "Zendesk", category: "Zendesk - CRM / Support" },
-  { name: "HubSpot Service Hub", category: "HubSpot - CRM / Support" },
-  { name: "Freshdesk", category: "Freshworks - CRM / Support" },
-  { name: "Kustomer", category: "Kustomer - CRM / Support" },
-  { name: "Gorgias", category: "Gorgias - CRM / Support" },
-  { name: "Genesys Cloud CX", category: "Genesys - Contact Centre" },
-  { name: "Five9", category: "Five9 - Contact Centre" },
-  { name: "NICE CXone", category: "NICE - Contact Centre" },
-  { name: "Talkdesk", category: "Talkdesk - Contact Centre" },
-  { name: "Amazon Connect", category: "AWS - Contact Centre" },
-  { name: "Qualtrics XM", category: "Qualtrics - Survey / VoC" },
-  { name: "Medallia", category: "Medallia - Survey / VoC" },
-  { name: "SurveyMonkey", category: "Momentive - Survey / VoC" },
-  { name: "Sprinklr", category: "Sprinklr - Social / Engagement" },
-  { name: "Hootsuite", category: "Hootsuite - Social / Engagement" },
-  { name: "Brandwatch", category: "Brandwatch - Social / Engagement" },
-  { name: "Intercom", category: "Intercom - Messaging / Support" },
-  { name: "Drift", category: "Drift - Messaging / Support" },
-  { name: "WhatsApp Business Platform", category: "Meta - Messaging / Support" },
+export const selectedProcesses = [
+  { label: "Customer Onboarding", value: 11 },
+  { label: "Live Chat Support", value: 9 },
+  { label: "Complaint Resolution", value: 7 },
+  { label: "Ticket Triage &\nRouting", value: 6 },
+  { label: "Voice / IVR Support", value: 6 },
+  { label: "Case\nDocumentation", value: 6 },
+  { label: "Account Updates &\nMaintenance", value: 4 },
+  { label: "SLA Monitoring", value: 4 },
 ] as const;
