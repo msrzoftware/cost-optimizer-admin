@@ -1,0 +1,10 @@
+.next
+.playwright-mcp
+build
+coverage
+cost-optimizer-dashboard-*.png
+node_modules
+out
+package-lock.json
+public/*.ico
+*.tsbuildinfo
