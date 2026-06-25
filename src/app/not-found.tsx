@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowLeft, LayoutDashboard, SearchX, ShieldAlert } from "lucide-react";
 
@@ -47,12 +49,13 @@ export default function NotFoundPage() {
 
 function BackButton() {
   return (
-    <Link
-      href="/"
+    <button
+      type="button"
+      onClick={() => window.history.back()}
       className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-4 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF]"
     >
       <ArrowLeft size={13} aria-hidden="true" />
       Go Back
-    </Link>
+    </button>
   );
 }
