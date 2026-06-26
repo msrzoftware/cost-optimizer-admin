@@ -42,7 +42,7 @@ const navigationItems: readonly NavigationItem[] = [
   { label: "Assessments", href: "/assessments", icon: ClipboardCheck },
   { label: "Search", href: "#search", icon: Search },
   { label: "Data Dictionary", href: "/data-dictionary", icon: BookOpen },
-  { label: "Experts", href: "#experts", icon: Users },
+  { label: "Experts", href: "/experts", icon: Users },
   { label: "Team", href: "#team", icon: UserRound },
   { label: "Trash", href: "#trash", icon: Trash2 },
   { label: "Settings", href: "#settings", icon: Settings },

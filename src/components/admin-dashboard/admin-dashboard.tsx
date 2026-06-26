@@ -25,6 +25,7 @@ import {
   selectedProcesses,
   stageWeights,
   type PipelineStatus,
+  type RecentAssessment,
 } from "./dashboard-data";
 import { fetchDashboardData } from "@/api/dashboard.api";
 
@@ -329,7 +330,7 @@ function RecentAssessmentsList() {
     queryKey: dashboardQueryKey,
     queryFn: fetchDashboardData,
   });
-  const assessments = data?.recentAssessments ?? [];
+  const assessments = getRecentlyUpdatedUsers(data?.recentAssessments ?? []);
   const errorMessage = error ? getErrorMessage(error) : "";
 
   return (
@@ -516,6 +517,57 @@ function normalizeStatusKey(value: string) {
 }
 
 function normalizeStatusLabel(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getRecentlyUpdatedUsers(assessments: RecentAssessment[]) {
+  const latestAssessmentByUser = new Map<
+    string,
+    { assessment: RecentAssessment; index: number; time: number }
+  >();
+
+  assessments.forEach((assessment, index) => {
+    const userKey = getRecentAssessmentUserKey(assessment);
+    const time = getRecentAssessmentTime(assessment);
+    const currentAssessment = latestAssessmentByUser.get(userKey);
+
+    if (
+      !currentAssessment ||
+      time > currentAssessment.time ||
+      (time === currentAssessment.time && index < currentAssessment.index)
+    ) {
+      latestAssessmentByUser.set(userKey, { assessment, index, time });
+    }
+  });
+
+  return Array.from(latestAssessmentByUser.values())
+    .sort((first, second) => {
+      if (first.time !== second.time) {
+        return second.time - first.time;
+      }
+
+      return first.index - second.index;
+    })
+    .map((item) => item.assessment);
+}
+
+function getRecentAssessmentUserKey(assessment: RecentAssessment) {
+  return normalizeRecentAssessmentValue(
+    getContactEmail(assessment.contact) || `${assessment.company}-${assessment.contact}`,
+  );
+}
+
+function getRecentAssessmentTime(assessment: RecentAssessment) {
+  const time = new Date(assessment.updatedAt || assessment.createdAt || "").getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getContactEmail(value: string) {
+  return value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+}
+
+function normalizeRecentAssessmentValue(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 

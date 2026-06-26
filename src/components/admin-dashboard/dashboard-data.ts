@@ -36,12 +36,14 @@ export type RecentAssessment = {
   company: string;
   contact: string;
   cost: string;
+  createdAt?: string;
   id: string;
   industry: string;
   savings: string;
   score: string;
   status: string;
   statusKey?: string;
+  updatedAt?: string;
 };
 
 export const pipelineStatuses: PipelineStatus[] = [

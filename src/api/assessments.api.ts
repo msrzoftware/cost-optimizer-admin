@@ -4,13 +4,47 @@ export type AdminAssessmentRow = {
   company: string;
   contact: string;
   cost: string;
+  createdAt?: string;
+  domain?: string;
   id: string;
   industry: string;
+  owner?: string;
+  preferences?: {
+    aiPreference?: string;
+    companySize?: string;
+    deploymentPreference?: string;
+    magicQuadrant?: string;
+  };
+  processCount?: number;
+  processes?: AdminAssessmentProcess[];
   savings: string;
   score: string;
+  selectedStackTools?: string[];
   status: string;
   statusKey?: string;
   updatedAt?: string;
+};
+
+export type AdminAssessmentProcess = {
+  automation?: string;
+  automationLevel?: number;
+  category?: string;
+  cost?: string;
+  estimatedCost?: {
+    amount?: number;
+    baseAmount?: {
+      amount?: number;
+      currency?: string;
+    };
+    currency?: string;
+  };
+  ftes?: string;
+  id?: string;
+  name?: string;
+  processId?: string;
+  saving?: string;
+  software?: string;
+  tier?: string;
 };
 
 export type AdminAssessmentStatus = {
@@ -48,7 +82,7 @@ export async function fetchAdminAssessments(): Promise<AdminAssessmentsPayload> 
     throw new Error("Admin access token is required to load assessments");
   }
 
-  const response = await fetch(buildAdminApiUrl(assessmentsDashboardPath), {
+  const response = await fetch(buildAdminApiUrl(assessmentsDashboardPath, { limit: "250" }), {
     credentials: "include",
     headers,
   });
