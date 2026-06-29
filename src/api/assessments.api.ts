@@ -5,6 +5,7 @@ export type AdminAssessmentRow = {
   contact: string;
   cost: string;
   createdAt?: string;
+  currencyConversionRate?: number;
   domain?: string;
   id: string;
   industry: string;
@@ -26,10 +27,25 @@ export type AdminAssessmentRow = {
 };
 
 export type AdminAssessmentProcess = {
+  assessmentId?: string;
   automation?: string;
   automationLevel?: number;
   category?: string;
+  costInputs?: {
+    dedicatedFte?: {
+      annualSalaryPerFte?: AdminCurrencyAmount;
+      count?: number;
+    };
+    efficiencyPercent?: number;
+    nonStaffingAnnualCost?: AdminCurrencyAmount;
+    sharedFtePool?: {
+      allocationPercent?: number;
+      annualSalaryPerFte?: AdminCurrencyAmount;
+      count?: number;
+    };
+  } | null;
   cost?: string;
+  description?: string;
   estimatedCost?: {
     amount?: number;
     baseAmount?: {
@@ -39,12 +55,20 @@ export type AdminAssessmentProcess = {
     currency?: string;
   };
   ftes?: string;
+  hoursPerYear?: number;
   id?: string;
   name?: string;
   processId?: string;
   saving?: string;
   software?: string;
+  source?: string;
+  stack?: string[];
   tier?: string;
+};
+
+export type AdminCurrencyAmount = {
+  amount?: number;
+  currency?: string;
 };
 
 export type AdminAssessmentStatus = {
@@ -93,13 +117,53 @@ export async function fetchAdminAssessments(): Promise<AdminAssessmentsPayload> 
   }
 
   const data = body?.data ?? {};
-  const assessments = Array.isArray(data.recentAssessments) ? data.recentAssessments : [];
+  const assessments = Array.isArray(data.recentAssessments)
+    ? data.recentAssessments.map((assessment) => ({
+        ...assessment,
+        processes: (assessment.processes ?? []).map((process) => ({
+          ...process,
+          assessmentId: assessment.id,
+        })),
+      }))
+    : [];
 
   return {
     assessments,
     pipelineByStatus: Array.isArray(data.pipelineByStatus) ? data.pipelineByStatus : [],
     totalAssessments: Number(data.totalAssessments) || assessments.length,
   };
+}
+
+export async function updateAdminAssessmentProcess(
+  assessmentId: string,
+  processId: string,
+  payload: AdminAssessmentProcess,
+) {
+  const headers = getRequestHeaders();
+
+  if (!headers.Authorization) {
+    throw new Error("Admin access token is required to update assessments");
+  }
+
+  const response = await fetch(
+    buildAdminApiUrl(
+      `/adm/cos-process-management/assessments/${encodeURIComponent(assessmentId)}/processes/${encodeURIComponent(processId)}`,
+    ),
+    {
+      body: JSON.stringify(payload),
+      credentials: "include",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    },
+  );
+  const body = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
+
+  if (!response.ok || body?.success === false || body?.status === false) {
+    throw new Error(body?.message || "Unable to update assessment process");
+  }
 }
 
 function getRequestHeaders() {

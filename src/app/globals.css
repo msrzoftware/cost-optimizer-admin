@@ -32,3 +32,19 @@ select,
 textarea {
   font: inherit;
 }
+
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.process-option-combobox::-webkit-calendar-picker-indicator,
+.process-option-combobox::-webkit-list-button {
+  display: none !important;
+  opacity: 0;
+  pointer-events: none;
+}

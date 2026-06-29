@@ -16,6 +16,8 @@ type AssessmentTrendPoint = {
 };
 
 export function AssessmentTrendChart({ data }: { data: readonly AssessmentTrendPoint[] }) {
+  const maxValue = Math.max(5, ...data.map((point) => point.value));
+
   return (
     <div
       className="mt-7 h-[180px] w-full"
@@ -32,7 +34,7 @@ export function AssessmentTrendChart({ data }: { data: readonly AssessmentTrendP
             dy={8}
             interval={0}
           />
-          <YAxis domain={[0, 5]} hide tickCount={5} />
+          <YAxis domain={[0, maxValue]} hide tickCount={5} />
           <Tooltip
             cursor={{ stroke: "#007AFF", strokeDasharray: "3 3", strokeOpacity: 0.24 }}
             contentStyle={{

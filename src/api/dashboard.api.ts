@@ -1,5 +1,12 @@
 import { buildAdminApiUrl } from "@/api/api-url";
-import type { PipelineStatus, RecentAssessment } from "@/components/admin-dashboard/dashboard-data";
+import type {
+  DashboardCount,
+  DashboardSummary,
+  DashboardTrendPoint,
+  DashboardValue,
+  PipelineStatus,
+  RecentAssessment,
+} from "@/components/admin-dashboard/dashboard-data";
 
 type ApiResponse<T> = {
   data?: T;
@@ -9,8 +16,15 @@ type ApiResponse<T> = {
 };
 
 type DashboardPayload = {
+  assessmentTrend?: DashboardTrendPoint[];
+  companySizeDistribution?: DashboardValue[];
+  currencyConversionRate?: number;
+  industryBreakdown?: DashboardCount[];
   pipelineByStatus?: PipelineStatus[];
   recentAssessments?: RecentAssessment[];
+  selectedProcesses?: DashboardValue[];
+  summary?: DashboardSummary;
+  totalAssessments?: number;
 };
 
 const dashboardPath = "/adm/cos-process-management/dashboard";
@@ -22,7 +36,7 @@ export async function fetchDashboardData() {
     throw new Error("Admin access token is required to load real pipeline counts");
   }
 
-  const response = await fetch(buildAdminApiUrl(dashboardPath), {
+  const response = await fetch(buildAdminApiUrl(dashboardPath, { limit: "250" }), {
     credentials: "include",
     headers,
   });

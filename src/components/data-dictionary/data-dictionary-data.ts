@@ -1,4 +1,5 @@
 export type DictionaryIndustry = {
+  displayOrder?: number;
   id: string;
   isActive?: boolean;
   name: string;
@@ -6,6 +7,7 @@ export type DictionaryIndustry = {
 };
 
 export type DictionaryDomain = {
+  displayOrder?: number;
   id: string;
   industryIds: string[];
   isActive?: boolean;
@@ -13,10 +15,25 @@ export type DictionaryDomain = {
   slug?: string;
 };
 
+export type DictionaryLibrary = {
+  displayOrder?: number;
+  domainId: string;
+  domainDisplayName?: string;
+  domainName: string;
+  id: string;
+  industryId: string;
+  industryName: string;
+  isActive?: boolean;
+  processCount?: number;
+};
+
 export type DictionaryProcess = {
   category: string;
+  categoryValue?: string;
   code: string;
   cost: string;
+  costAmount?: number;
+  costCurrency?: "AED" | "USD";
   description: string;
   domain: string;
   domainId?: string;
@@ -24,13 +41,15 @@ export type DictionaryProcess = {
   id: string;
   industryLabel?: string;
   industryIds: string[];
+  isActive?: boolean;
   name: string;
   scope?: "industry-default" | "industry-domain";
   source: string;
   tier: ProcessTier;
+  tierValue?: string;
 };
 
-export type ProcessTier = "Must-Have" | "Good-to-Have" | "Nice to Have" | "Future Enhancement";
+export type ProcessTier = string;
 
 export type ProcessOption = {
   label: string;
@@ -39,8 +58,14 @@ export type ProcessOption = {
 
 export type TechStackTool = {
   category: string;
+  domainId?: string;
+  domainName?: string;
   id: string;
+  industryId?: string;
+  industryName?: string;
+  isActive?: boolean;
   name: string;
+  scope?: "common" | "industry-default" | "industry-domain";
   vendor: string;
 };
 
@@ -80,7 +105,7 @@ export const automationLevels = [
 export const processTiers = [
   { label: "Must-Have", slug: "must-have" },
   { label: "Good-to-Have", slug: "good-to-have" },
-  { label: "Nice to Have", slug: "tried-legacy" },
+  { label: "Nice to Have", slug: "nice-to-have" },
   { label: "Future Enhancement", slug: "future-enhancement" },
 ] as const satisfies readonly { label: ProcessTier; slug: string }[];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useMemo,
   useState,
@@ -8,7 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine,
@@ -16,12 +17,15 @@ import {
   Building2,
   CalendarDays,
   Car,
+  ChevronDown,
   ClipboardPlus,
   Home,
   Landmark,
   LayoutGrid,
   Mail,
+  Percent,
   Printer,
+  RotateCcw,
   Search,
   Shield,
   ShoppingBag,
@@ -34,12 +38,14 @@ import {
   fetchAdminAssessments,
   type AdminAssessmentProcess,
   type AdminAssessmentRow,
+  updateAdminAssessmentProcess,
 } from "@/api/assessments.api";
 import { AdminShell } from "@/components/admin-shell/admin-shell";
 
 const assessmentsQueryKey = ["admin-assessments"] as const;
 const pageSize = 10;
 const emptyAssessments: AdminAssessmentRow[] = [];
+const defaultUsdToAedRate = 3.6725;
 
 type SortKey = "company" | "score" | "cost" | "savings";
 type SortDirection = "asc" | "desc";
@@ -59,6 +65,7 @@ type AssessmentSummary = {
   contact: string;
   cost: string;
   createdAt?: string;
+  currencyConversionRate: number;
   domain: string;
   id: string;
   industry: string;
@@ -74,6 +81,25 @@ type AssessmentSummary = {
   statusKey?: string;
   updatedAt?: string;
 };
+
+type ProcessEditFormState = {
+  automationLevel: string;
+  category: string;
+  dedicatedFtes: string;
+  dedicatedSalaryAed: string;
+  description: string;
+  hoursPerYear: string;
+  name: string;
+  processEfficiencyPercent: string;
+  sharedAllocationPercent: string;
+  sharedFtes: string;
+  sharedSalaryAed: string;
+  softwareCostAed: string;
+  stack: string;
+  tier: string;
+};
+
+const automationLevelOptions = [1, 2, 3, 4, 5] as const;
 
 const statusStyles = {
   gray: {
@@ -118,6 +144,11 @@ const tableHeaderTextStyle: CSSProperties = {
   lineHeight: "15px",
   textTransform: "uppercase",
 };
+const detailInputClass =
+  "h-9 w-full rounded-md border border-black/[0.08] bg-white px-3 text-xs font-semibold text-[#171717] outline-none placeholder:text-[#A1A1AA] focus:border-[#007AFF]";
+
+const filterShellClassName =
+  "h-10 rounded-md border border-[#DCE8F8] bg-white text-sm font-semibold text-[#171717] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition focus-within:border-[#007AFF] focus-within:ring-2 focus-within:ring-[#007AFF]/10 hover:border-[#BBD6FF]";
 
 export function AssessmentsPage() {
   const router = useRouter();
@@ -140,7 +171,7 @@ export function AssessmentsPage() {
   const assessments = data?.assessments ?? emptyAssessments;
   const totalAssessments = data?.totalAssessments ?? assessments.length;
   const errorMessage = error ? getErrorMessage(error) : "";
-  const industryOptions = useMemo(() => getUniqueOptions(assessments, "industry"), [assessments]);
+  const industryOptions = useMemo(() => getIndustryOptions(assessments), [assessments]);
   const statusOptions = useMemo(() => getUniqueOptions(assessments, "status"), [assessments]);
 
   const filteredAssessments = useMemo(() => {
@@ -152,8 +183,9 @@ export function AssessmentsPage() {
 
     return assessments
       .filter((assessment) => {
+        const assessmentIndustries = getAssessmentIndustries(assessment);
         const searchableText = normalizeSearch(
-          `${assessment.company} ${assessment.contact} ${assessment.industry} ${assessment.status}`,
+          `${assessment.company} ${assessment.contact} ${assessmentIndustries.join(" ")} ${assessment.status}`,
         );
         const updatedTime = getAssessmentUpdatedTime(assessment);
 
@@ -161,7 +193,10 @@ export function AssessmentsPage() {
           return false;
         }
 
-        if (industryFilter !== "all" && assessment.industry !== industryFilter) {
+        if (
+          industryFilter !== "all" &&
+          !assessmentIndustries.includes(industryFilter)
+        ) {
           return false;
         }
 
@@ -206,6 +241,13 @@ export function AssessmentsPage() {
   const activePage = Math.min(page, pageCount);
   const firstRowIndex = assessmentSummaries.length ? (activePage - 1) * pageSize + 1 : 0;
   const lastRowIndex = Math.min(activePage * pageSize, assessmentSummaries.length);
+  const hasActiveFilters =
+    searchQuery.trim() !== "" ||
+    industryFilter !== "all" ||
+    statusFilter !== "all" ||
+    minimumScoreFilter.trim() !== "" ||
+    fromDateFilter !== "" ||
+    toDateFilter !== "";
   const pagedAssessments = assessmentSummaries.slice(
     (activePage - 1) * pageSize,
     activePage * pageSize,
@@ -226,98 +268,119 @@ export function AssessmentsPage() {
     setPage(1);
   }
 
+  function resetFilters() {
+    setSearchQuery("");
+    setIndustryFilter("all");
+    setStatusFilter("all");
+    setMinimumScoreFilter("");
+    setFromDateFilter("");
+    setToDateFilter("");
+    setPage(1);
+  }
+
   function openAssessment(assessmentId: string) {
     router.push(`/assessments/${encodeURIComponent(assessmentId)}`);
   }
 
   return (
     <AdminShell activeItem="Assessments">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] leading-tight font-bold tracking-normal">Assessments</h1>
-          <p className="mt-2 text-sm font-semibold text-[#86868B]">
-            {isLoading
-              ? "Loading submissions..."
-              : `${assessmentSummaries.length} users from ${totalAssessments} total submissions`}
-          </p>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <header className="shrink-0 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[26px] leading-tight font-bold tracking-normal">Assessments</h1>
+            <p className="mt-2 text-sm font-semibold text-[#86868B]">
+              {isLoading
+                ? "Loading submissions..."
+                : `${assessmentSummaries.length} users from ${totalAssessments} total submissions`}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => exportAssessmentsCsv(filteredAssessments)}
+              disabled={!filteredAssessments.length}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowDownToLine size={13} aria-hidden="true" />
+              Export CSV
+            </button>
+            <button
+              type="button"
+              disabled
+              title="New assessments are created from the customer assessment flow."
+              className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-[#007AFF] px-4 text-xs font-bold text-white opacity-80"
+            >
+              <ClipboardPlus size={13} aria-hidden="true" />
+              Add Assessment
+            </button>
+          </div>
+        </header>
+
+        <section className="mt-8 flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Assessments table">
+        <div className="mb-3 rounded-md border border-[#E7EEF8] bg-[#F8FBFF] p-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <SearchInput
+              value={searchQuery}
+              onChange={(value) => updateFilter(setSearchQuery, value)}
+            />
+            <FilterSelect
+              ariaLabel="Filter by industry"
+              value={industryFilter}
+              onChange={(value) => updateFilter(setIndustryFilter, value)}
+              className="sm:w-[184px]"
+            >
+              <option value="all">All industries</option>
+              {industryOptions.map((industry) => (
+                <option key={industry} value={industry}>
+                  {industry}
+                </option>
+              ))}
+            </FilterSelect>
+            <FilterSelect
+              ariaLabel="Filter by status"
+              value={statusFilter}
+              onChange={(value) => updateFilter(setStatusFilter, value)}
+              className="sm:w-[164px]"
+            >
+              <option value="all">All statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </FilterSelect>
+            <MetricFilterInput
+              value={minimumScoreFilter}
+              onChange={(value) => updateFilter(setMinimumScoreFilter, value)}
+            />
+            <DateInput
+              ariaLabel="Updated from date"
+              value={fromDateFilter}
+              onChange={(value) => updateFilter(setFromDateFilter, value)}
+            />
+            <span className="flex h-10 items-center px-1 text-xs font-bold text-[#8E9AAB]">
+              to
+            </span>
+            <DateInput
+              ariaLabel="Updated to date"
+              value={toDateFilter}
+              onChange={(value) => updateFilter(setToDateFilter, value)}
+            />
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={!hasActiveFilters}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#DCE8F8] bg-white px-3 text-sm font-bold text-[#555555] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-[#007AFF]/30 hover:text-[#007AFF] disabled:cursor-not-allowed disabled:text-[#A1A1AA] disabled:opacity-60"
+              aria-label="Reset assessment filters"
+            >
+              <RotateCcw size={13} aria-hidden="true" />
+              Reset filters
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => exportAssessmentsCsv(filteredAssessments)}
-            disabled={!filteredAssessments.length}
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ArrowDownToLine size={13} aria-hidden="true" />
-            Export CSV
-          </button>
-          <button
-            type="button"
-            disabled
-            title="New assessments are created from the customer assessment flow."
-            className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-[#007AFF] px-4 text-xs font-bold text-white opacity-80"
-          >
-            <ClipboardPlus size={13} aria-hidden="true" />
-            Add Assessment
-          </button>
-        </div>
-      </header>
-
-      <section className="mt-8 flex min-h-[520px] flex-col" aria-label="Assessments table">
-        <div className="mb-[10px] flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={searchQuery}
-            onChange={(value) => updateFilter(setSearchQuery, value)}
-          />
-          <FilterSelect
-            ariaLabel="Filter by industry"
-            value={industryFilter}
-            onChange={(value) => updateFilter(setIndustryFilter, value)}
-          >
-            <option value="all">All industries</option>
-            {industryOptions.map((industry) => (
-              <option key={industry} value={industry}>
-                {industry}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterSelect
-            ariaLabel="Filter by status"
-            value={statusFilter}
-            onChange={(value) => updateFilter(setStatusFilter, value)}
-          >
-            <option value="all">All statuses</option>
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </FilterSelect>
-          <input
-            aria-label="Minimum DI score"
-            value={minimumScoreFilter}
-            onChange={(event) =>
-              updateFilter(setMinimumScoreFilter, event.target.value)
-            }
-            className="h-8 w-full rounded-md border border-black/[0.08] bg-white px-3 text-[11px] font-semibold text-[#555555] outline-none placeholder:text-[#A1A1AA] focus:border-[#007AFF] sm:w-[112px]"
-            inputMode="numeric"
-            placeholder="DI min %"
-          />
-          <DateInput
-            ariaLabel="Updated from date"
-            value={fromDateFilter}
-            onChange={(value) => updateFilter(setFromDateFilter, value)}
-          />
-          <span className="px-1 text-xs font-bold text-[#A1A1AA]">to</span>
-          <DateInput
-            ariaLabel="Updated to date"
-            value={toDateFilter}
-            onChange={(value) => updateFilter(setToDateFilter, value)}
-          />
-        </div>
-
-        <div className="flex h-[calc(100vh-190px)] min-h-[460px] flex-col overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex-1 overflow-auto">
             <table className="w-full min-w-[1170px] table-fixed border-collapse">
               <colgroup>
@@ -403,7 +466,8 @@ export function AssessmentsPage() {
             />
           </div>
         </div>
-      </section>
+        </section>
+      </div>
     </AdminShell>
   );
 }
@@ -447,24 +511,7 @@ export function AssessmentDetailPage({
   if (isLoading) {
     return (
       <AdminShell activeItem="Assessments">
-        <section className="min-h-[calc(100vh-56px)] bg-white px-5 py-7 text-[#171717]">
-          <button
-            type="button"
-            onClick={backToAssessments}
-            className="inline-flex items-center gap-2 text-[11px] font-semibold text-[#86868B] transition hover:text-[#007AFF]"
-          >
-            <ArrowLeft size={12} aria-hidden="true" />
-            Back to assessments
-          </button>
-          <div className="mt-6 grid gap-3 md:grid-cols-5">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-[68px] animate-pulse rounded-md border border-black/[0.08] bg-black/[0.03]"
-              />
-            ))}
-          </div>
-        </section>
+        <AssessmentDetailSkeleton onBack={backToAssessments} />
       </AdminShell>
     );
   }
@@ -606,13 +653,13 @@ function SearchInput({
   value: string;
 }) {
   return (
-    <label className="flex h-8 w-full items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 sm:w-[300px]">
+    <label className={`flex w-full items-center gap-2 px-3 sm:w-[320px] ${filterShellClassName}`}>
       <Search size={13} className="text-[#A1A1AA]" aria-hidden="true" />
       <input
         aria-label="Search company, contact, or region"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 text-[11px] font-semibold text-[#555555] outline-none placeholder:text-[#A1A1AA]"
+        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#171717] outline-none placeholder:text-[#A1A1AA]"
         placeholder="Search company, contact, region..."
         type="search"
       />
@@ -623,23 +670,54 @@ function SearchInput({
 function FilterSelect({
   ariaLabel,
   children,
+  className = "",
   onChange,
   value,
 }: {
   ariaLabel: string;
   children: ReactNode;
+  className?: string;
   onChange: (value: string) => void;
   value: string;
 }) {
   return (
-    <select
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="h-8 w-full rounded-md border border-black/[0.08] bg-white px-3 text-[11px] font-semibold text-[#555555] outline-none focus:border-[#007AFF] sm:w-[148px]"
-    >
-      {children}
-    </select>
+    <label className={`relative block w-full ${filterShellClassName} ${className}`}>
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-full w-full appearance-none rounded-md bg-transparent pr-9 pl-3 text-sm font-semibold text-[#171717] outline-none"
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={14}
+        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[#007AFF]"
+        aria-hidden="true"
+      />
+    </label>
+  );
+}
+
+function MetricFilterInput({
+  onChange,
+  value,
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label className={`flex w-full items-center gap-2 px-3 sm:w-[124px] ${filterShellClassName}`}>
+      <Percent size={13} className="text-[#007AFF]" aria-hidden="true" />
+      <input
+        aria-label="Minimum DI score"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#171717] outline-none placeholder:text-[#A1A1AA]"
+        inputMode="numeric"
+        placeholder="DI min"
+      />
+    </label>
   );
 }
 
@@ -653,13 +731,13 @@ function DateInput({
   value: string;
 }) {
   return (
-    <label className="flex h-8 w-full items-center gap-2 rounded-md border border-black/[0.08] bg-white px-3 sm:w-[126px]">
-      <CalendarDays size={12} className="text-[#A1A1AA]" aria-hidden="true" />
+    <label className={`flex w-full items-center gap-2 px-3 sm:w-[154px] ${filterShellClassName}`}>
+      <CalendarDays size={13} className="text-[#007AFF]" aria-hidden="true" />
       <input
         aria-label={ariaLabel}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 text-xs font-semibold text-[#555555] outline-none"
+        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#171717] outline-none"
         type="date"
       />
     </label>
@@ -755,6 +833,144 @@ function IndustryIcon({ industry }: { industry: string }) {
   const Icon = industryIconStyles[industry]?.icon || LayoutGrid;
 
   return <Icon size={12} className="shrink-0 text-[#86868B]" aria-hidden="true" />;
+}
+
+function AssessmentDetailSkeleton({ onBack }: { onBack: () => void }) {
+  return (
+    <section
+      className="min-h-[calc(100vh-56px)] bg-white px-5 py-7 text-[#171717]"
+      aria-busy="true"
+      aria-label="Loading assessment details"
+    >
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-[11px] font-semibold text-[#86868B] transition hover:text-[#007AFF]"
+      >
+        <ArrowLeft size={12} aria-hidden="true" />
+        Back to assessments
+      </button>
+
+      <header className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <SkeletonBlock className="h-8 w-full max-w-[420px]" />
+          <SkeletonBlock className="mt-2 h-3 w-full max-w-[280px]" />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <SkeletonBlock className="h-6 w-[112px] rounded-full" />
+            <SkeletonBlock className="h-3 w-[126px]" />
+            <SkeletonBlock className="h-3 w-[104px]" />
+            <SkeletonBlock className="h-3 w-[112px]" />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <SkeletonBlock className="h-9 w-[102px]" />
+          <SkeletonBlock className="h-9 w-[180px]" />
+          <SkeletonBlock className="size-9" />
+        </div>
+      </header>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div
+            key={index}
+            className="rounded-md border border-black/[0.08] bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]"
+          >
+            <SkeletonBlock className="h-2.5 w-[70%]" />
+            <SkeletonBlock className="mt-3 h-5 w-[58%]" />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-7 flex overflow-hidden border-b border-black/[0.08]">
+        {[78, 68, 86, 112, 72, 116, 58, 58].map((width, index) => (
+          <div key={index} className="flex h-12 shrink-0 items-center px-4">
+            <SkeletonBlock className="h-4" style={{ width }} />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 grid gap-4 xl:grid-cols-2">
+        <AssessmentDetailPanelSkeleton
+          titleWidth={132}
+          rows={[148, 116, 136, 176, 122, 72]}
+          footer
+        />
+        <AssessmentDetailPanelSkeleton
+          titleWidth={172}
+          rows={[126, 104, 132, 156, 166, 144]}
+          tags
+        />
+        <section className="rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] xl:col-span-2">
+          <div className="flex min-h-[45px] items-center justify-between border-b border-black/[0.08] px-5 py-3">
+            <SkeletonBlock className="h-2.5 w-[68px]" />
+            <SkeletonBlock className="h-4 w-[112px]" />
+          </div>
+          <div className="px-5 py-4">
+            <SkeletonBlock className="h-3 w-full max-w-[520px]" />
+            <SkeletonBlock className="mt-2 h-3 w-full max-w-[360px]" />
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function AssessmentDetailPanelSkeleton({
+  footer = false,
+  rows,
+  tags = false,
+  titleWidth,
+}: {
+  footer?: boolean;
+  rows: number[];
+  tags?: boolean;
+  titleWidth: number;
+}) {
+  return (
+    <section className="rounded-md border border-black/[0.08] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <SkeletonBlock className="h-2.5" style={{ width: titleWidth }} />
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        {rows.map((width, index) => (
+          <div key={index}>
+            <SkeletonBlock className="h-2.5 w-[92px]" />
+            <SkeletonBlock className="mt-2 h-4" style={{ width }} />
+          </div>
+        ))}
+      </div>
+      {tags ? (
+        <div className="mt-5">
+          <SkeletonBlock className="h-2.5 w-[156px]" />
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {[86, 104, 72, 118].map((width) => (
+              <SkeletonBlock key={width} className="h-6 rounded-full" style={{ width }} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {footer ? (
+        <div className="mt-5 border-t border-black/[0.08] pt-4">
+          <SkeletonBlock className="h-2.5 w-[118px]" />
+          <SkeletonBlock className="mt-3 h-9 w-full max-w-[220px]" />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SkeletonBlock({
+  className = "",
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <span
+      className={`block animate-pulse rounded-md bg-black/[0.06] ${className}`}
+      style={style}
+    />
+  );
 }
 
 function AssessmentDetailView({
@@ -958,12 +1174,62 @@ function AssessmentOverview({ assessment }: { assessment: AssessmentSummary }) {
 }
 
 function AssessmentProcesses({ assessment }: { assessment: AssessmentSummary }) {
+  const queryClient = useQueryClient();
+  const [expandedProcessKey, setExpandedProcessKey] = useState("");
+  const [processNotice, setProcessNotice] = useState("");
+  const updateProcessMutation = useMutation({
+    mutationFn: ({
+      assessmentId,
+      payload,
+      processId,
+    }: {
+      assessmentId: string;
+      payload: AdminAssessmentProcess;
+      processId: string;
+    }) => updateAdminAssessmentProcess(assessmentId, processId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: assessmentsQueryKey });
+    },
+  });
+
+  async function handleSaveProcess(process: AdminAssessmentProcess, form: ProcessEditFormState) {
+    const assessmentId = process.assessmentId;
+    const processId = getProcessKey(process);
+
+    if (!assessmentId || !processId) {
+      setProcessNotice("Assessment process id is missing. Refresh and try again.");
+      return;
+    }
+
+    try {
+      setProcessNotice("");
+      await updateProcessMutation.mutateAsync({
+        assessmentId,
+        processId,
+        payload: buildProcessUpdatePayload(process, form),
+      });
+      setExpandedProcessKey("");
+      setProcessNotice("Process details saved.");
+    } catch (error) {
+      setProcessNotice(getErrorMessage(error));
+    }
+  }
+
   return (
     <section className="mt-6 overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-black/[0.08] px-5 py-4">
+      <div className="flex items-center justify-between gap-3 border-b border-black/[0.08] px-5 py-4">
         <p className="text-[10px] font-bold tracking-[0.14em] text-[#86868B] uppercase">
           Selected processes ({formatNullableCount(assessment.processCount)})
         </p>
+        {processNotice ? (
+          <p
+            className={`text-[11px] font-bold ${
+              updateProcessMutation.isError ? "text-[#EF4444]" : "text-[#10B981]"
+            }`}
+          >
+            {processNotice}
+          </p>
+        ) : null}
       </div>
 
       <div className="overflow-auto">
@@ -981,9 +1247,34 @@ function AssessmentProcesses({ assessment }: { assessment: AssessmentSummary }) 
           </thead>
           <tbody>
             {assessment.processes.length ? (
-              assessment.processes.map((process) => (
-                <ProcessRow key={getProcessKey(process)} process={process} />
-              ))
+              assessment.processes.map((process) => {
+                const processKey = getProcessKey(process);
+                const isExpanded = expandedProcessKey === processKey;
+
+                return (
+                  <Fragment key={processKey}>
+                    <ProcessRow
+                      currencyConversionRate={assessment.currencyConversionRate}
+                      expanded={isExpanded}
+                      process={process}
+                      onToggle={() => setExpandedProcessKey(isExpanded ? "" : processKey)}
+                    />
+                    {isExpanded ? (
+                      <tr>
+                        <td colSpan={7} className="border-b border-black/[0.05] bg-[#FAFAFA] p-0">
+                          <AssessmentProcessEditor
+                            currencyConversionRate={assessment.currencyConversionRate}
+                            isSaving={updateProcessMutation.isPending}
+                            process={process}
+                            onCancel={() => setExpandedProcessKey("")}
+                            onSave={(form) => void handleSaveProcess(process, form)}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={7} className="h-28 px-5 text-center text-sm font-semibold text-[#86868B]">
@@ -1116,7 +1407,7 @@ function AssessmentResults({ assessment }: { assessment: AssessmentSummary }) {
                 </div>
                 <p className="text-xs font-bold text-[#007AFF]">{process.tier || "--"}</p>
                 <p className="text-xs font-bold text-[#10B981] sm:text-right">
-                  {formatAedCurrency(getProcessSaving(process, getProcessCost(process)))}
+                  {formatAedCurrency(getProcessSaving(process, getProcessCost(process, assessment.currencyConversionRate)))}
                 </p>
               </div>
             ))}
@@ -1205,15 +1496,31 @@ function EmptyTabMessage({ message }: { message: string }) {
   return <p className="py-6 text-center text-sm font-semibold text-[#86868B]">{message}</p>;
 }
 
-function ProcessRow({ process }: { process: AdminAssessmentProcess }) {
+function ProcessRow({
+  currencyConversionRate,
+  expanded,
+  onToggle,
+  process,
+}: {
+  currencyConversionRate: number;
+  expanded: boolean;
+  onToggle: () => void;
+  process: AdminAssessmentProcess;
+}) {
   const automationLevel = Math.min(5, Math.max(1, Number(process.automationLevel) || 1));
-  const cost = getProcessCost(process);
+  const cost = getProcessCost(process, currencyConversionRate);
   const saving = getProcessSaving(process, cost);
 
   return (
-    <tr className="h-[58px] border-b border-black/[0.05] last:border-b-0">
+    <tr
+      className="h-[58px] cursor-pointer border-b border-black/[0.05] transition hover:bg-[#FAFAFA] last:border-b-0"
+      onClick={onToggle}
+    >
       <td className="px-5 py-3">
-        <p className="truncate text-xs font-bold text-[#171717]">{process.name || process.processId || "--"}</p>
+        <p className="truncate text-xs font-bold text-[#171717]">
+          <span className="mr-2 inline-block text-[#86868B]">{expanded ? "−" : "+"}</span>
+          {process.name || process.processId || "--"}
+        </p>
         <p className="mt-1 truncate text-[10px] font-semibold text-[#86868B]">{process.category || "--"}</p>
       </td>
       <td className="px-5 py-3">
@@ -1228,10 +1535,230 @@ function ProcessRow({ process }: { process: AdminAssessmentProcess }) {
         {process.automation || getAutomationLabel(automationLevel)}
       </td>
       <td className="px-5 py-3 text-[11px] font-bold text-[#171717]">{formatAedCurrency(cost)}</td>
-      <td className="px-5 py-3 text-[11px] font-bold text-[#555555]">{process.ftes || "--"}</td>
-      <td className="px-5 py-3 text-[11px] font-bold text-[#555555]">{process.software || "--"}</td>
+      <td className="px-5 py-3 text-[11px] font-bold text-[#555555]">{getProcessFteLabel(process)}</td>
+      <td className="px-5 py-3 text-[11px] font-bold text-[#555555]">{getProcessSoftwareLabel(process, currencyConversionRate)}</td>
       <td className="px-5 py-3 text-right text-[11px] font-bold text-[#10B981]">{formatAedCurrency(saving)}</td>
     </tr>
+  );
+}
+
+function AssessmentProcessEditor({
+  currencyConversionRate,
+  isSaving,
+  onCancel,
+  onSave,
+  process,
+}: {
+  currencyConversionRate: number;
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (form: ProcessEditFormState) => void;
+  process: AdminAssessmentProcess;
+}) {
+  const [form, setForm] = useState(() => createProcessEditForm(process, currencyConversionRate));
+
+  function updateField(field: keyof ProcessEditFormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  const totalCost = calculateProcessFormCost(form);
+
+  return (
+    <div className="p-5">
+      <div className="rounded-md border border-black/[0.08] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.08] px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-[#171717]">
+              {form.name || process.name || "Selected process"}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-[#86868B]">
+              Editing selected assessment process fields
+            </p>
+          </div>
+          <p className="rounded-full bg-[#EAF3FF] px-2.5 py-1 text-[10px] font-bold text-[#007AFF]">
+            {formatAedCurrency(totalCost)} / yr
+          </p>
+        </div>
+
+        <div className="grid gap-4 p-4 lg:grid-cols-2">
+          <Field label="Process efficiency %">
+            <input
+              value={form.processEfficiencyPercent}
+              onChange={(event) => updateField("processEfficiencyPercent", cleanDecimalInput(event.target.value, 100))}
+              className={detailInputClass}
+              placeholder="e.g. 65"
+            />
+          </Field>
+          <Field label="Digitization level">
+            <div className="grid grid-cols-5 overflow-hidden rounded-md border border-black/[0.08]">
+              {automationLevelOptions.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => updateField("automationLevel", String(level))}
+                  className={`h-9 border-r border-black/[0.08] text-xs font-bold last:border-r-0 ${
+                    Number(form.automationLevel) === level
+                      ? "bg-[#10B981] text-white"
+                      : "bg-white text-[#555555] hover:bg-[#FAFAFA]"
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Process name">
+            <input
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              className={detailInputClass}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Category">
+              <input
+                value={form.category}
+                onChange={(event) => updateField("category", event.target.value)}
+                className={detailInputClass}
+              />
+            </Field>
+            <Field label="Tier">
+              <input
+                value={form.tier}
+                onChange={(event) => updateField("tier", event.target.value)}
+                className={detailInputClass}
+              />
+            </Field>
+          </div>
+          <Field className="lg:col-span-2" label="Description">
+            <textarea
+              value={form.description}
+              onChange={(event) => updateField("description", event.target.value)}
+              className={`${detailInputClass} min-h-20 py-2`}
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-4 border-t border-black/[0.08] p-4 lg:grid-cols-2">
+          <section className="rounded-md border border-black/[0.08] bg-[#FAFAFA] p-4">
+            <p className="text-[10px] font-bold tracking-[0.12em] text-[#86868B] uppercase">
+              FTE & staffing
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Shared FTE pool">
+                <input
+                  value={form.sharedFtes}
+                  onChange={(event) => updateField("sharedFtes", cleanDecimalInput(event.target.value))}
+                  className={detailInputClass}
+                  placeholder="e.g. 2"
+                />
+              </Field>
+              <Field label="Shared salary / FTE (AED)">
+                <input
+                  value={form.sharedSalaryAed}
+                  onChange={(event) => updateField("sharedSalaryAed", cleanDecimalInput(event.target.value))}
+                  className={detailInputClass}
+                  placeholder="e.g. 30000"
+                />
+              </Field>
+              <Field label="Allocation for this process %">
+                <input
+                  value={form.sharedAllocationPercent}
+                  onChange={(event) => updateField("sharedAllocationPercent", cleanDecimalInput(event.target.value, 100))}
+                  className={detailInputClass}
+                  placeholder="e.g. 50"
+                />
+              </Field>
+              <Field label="Dedicated FTEs">
+                <input
+                  value={form.dedicatedFtes}
+                  onChange={(event) => updateField("dedicatedFtes", cleanDecimalInput(event.target.value))}
+                  className={detailInputClass}
+                  placeholder="e.g. 2"
+                />
+              </Field>
+              <Field label="Dedicated salary / FTE (AED)">
+                <input
+                  value={form.dedicatedSalaryAed}
+                  onChange={(event) => updateField("dedicatedSalaryAed", cleanDecimalInput(event.target.value))}
+                  className={detailInputClass}
+                  placeholder="e.g. 88000"
+                />
+              </Field>
+              <Field label="Est. hours / year">
+                <input
+                  value={form.hoursPerYear}
+                  onChange={(event) => updateField("hoursPerYear", cleanDecimalInput(event.target.value))}
+                  className={detailInputClass}
+                  placeholder="e.g. 2080"
+                />
+              </Field>
+            </div>
+          </section>
+          <section className="rounded-md border border-black/[0.08] bg-[#FAFAFA] p-4">
+            <p className="text-[10px] font-bold tracking-[0.12em] text-[#86868B] uppercase">
+              Technology cost & stack
+            </p>
+            <div className="mt-3 grid gap-3">
+              <Field label="Software cost / yr (AED)">
+                <input
+                  value={form.softwareCostAed}
+                  onChange={(event) => updateField("softwareCostAed", cleanDecimalInput(event.target.value))}
+                  className={detailInputClass}
+                  placeholder="e.g. 44000"
+                />
+              </Field>
+              <Field label="Technology stack">
+                <textarea
+                  value={form.stack}
+                  onChange={(event) => updateField("stack", event.target.value)}
+                  className={`${detailInputClass} min-h-[132px] py-2`}
+                  placeholder="Freshdesk, Mailchimp, ServiceNow CSM"
+                />
+              </Field>
+            </div>
+          </section>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-black/[0.08] px-4 py-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSaving}
+            className="h-9 rounded-md border border-black/[0.08] bg-white px-4 text-xs font-bold text-[#555555] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(form)}
+            disabled={isSaving || !form.name.trim()}
+            className="h-9 rounded-md bg-[#007AFF] px-5 text-xs font-bold text-white transition hover:bg-[#006EE6] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  children,
+  className = "",
+  label,
+}: {
+  children: ReactNode;
+  className?: string;
+  label: string;
+}) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1.5 block text-[9px] font-bold tracking-[0.12em] text-[#86868B] uppercase">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
@@ -1342,7 +1869,9 @@ function createAssessmentSummary(id: string, rows: AdminAssessmentRow[]): Assess
     (first, second) => getSortableTime(second) - getSortableTime(first),
   );
   const latestAssessment = sortedRows[0];
-  const industries = getUniqueValues(rows.map((row) => row.industry)).filter(
+  const industries = getUniqueValues(
+    rows.flatMap((row) => getAssessmentIndustries(row)),
+  ).filter(
     (industry) => industry !== "--",
   );
   const processes = getUniqueProcesses(rows.flatMap((row) => row.processes ?? []));
@@ -1355,6 +1884,7 @@ function createAssessmentSummary(id: string, rows: AdminAssessmentRow[]): Assess
     contact: latestAssessment?.contact || "--",
     cost: formatAedCurrency(sumMetric(rows.map((row) => row.cost))),
     createdAt: getEarliestDate(rows.map((row) => row.createdAt || row.updatedAt)),
+    currencyConversionRate: getAssessmentCurrencyConversionRate(rows),
     domain: getUniqueValues(rows.map((row) => row.domain)).join(", ") || "--",
     id,
     industry: getIndustrySummaryLabel(industries),
@@ -1370,6 +1900,14 @@ function createAssessmentSummary(id: string, rows: AdminAssessmentRow[]): Assess
     statusKey: latestAssessment?.statusKey,
     updatedAt: latestAssessment?.updatedAt,
   };
+}
+
+function getAssessmentCurrencyConversionRate(rows: AdminAssessmentRow[]) {
+  const rate = rows
+    .map((row) => Number(row.currencyConversionRate))
+    .find((value) => Number.isFinite(value) && value > 0);
+
+  return rate ?? defaultUsdToAedRate;
 }
 
 function getAssessmentGroupKey(row: AdminAssessmentRow) {
@@ -1528,7 +2066,193 @@ function getPotentialDi(value: string) {
   return `${Math.min(95, Math.max(75, currentScore + 25))}%`;
 }
 
-function getProcessCost(process: AdminAssessmentProcess) {
+function getCurrencyAmountAed(
+  value?: { amount?: number; currency?: string } | null,
+  currencyConversionRate = defaultUsdToAedRate,
+) {
+  const amount = Number(value?.amount);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+
+  return value?.currency === "USD"
+    ? Math.round(amount * currencyConversionRate)
+    : Math.round(amount);
+}
+
+function formatNumberInput(value: number | undefined) {
+  if (!Number.isFinite(value) || Number(value) <= 0) {
+    return "";
+  }
+
+  const roundedValue = Math.round(Number(value) * 100) / 100;
+  return Number.isInteger(roundedValue)
+    ? String(roundedValue)
+    : String(roundedValue).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function parseFormNumber(value: string) {
+  const parsedValue = Number.parseFloat(value);
+
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 0;
+}
+
+function cleanDecimalInput(value: string, maxValue = Number.POSITIVE_INFINITY) {
+  const cleanedValue = value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+
+  if (!cleanedValue) {
+    return "";
+  }
+
+  return formatNumberInput(Math.min(parseFormNumber(cleanedValue), maxValue));
+}
+
+function createProcessEditForm(
+  process: AdminAssessmentProcess,
+  currencyConversionRate = defaultUsdToAedRate,
+): ProcessEditFormState {
+  const costInputs = process.costInputs;
+  const sharedFtePool = costInputs?.sharedFtePool;
+  const dedicatedFte = costInputs?.dedicatedFte;
+
+  return {
+    automationLevel: String(Math.min(5, Math.max(1, Number(process.automationLevel) || 1))),
+    category: process.category || "",
+    dedicatedFtes: formatNumberInput(dedicatedFte?.count),
+    dedicatedSalaryAed: formatNumberInput(getCurrencyAmountAed(dedicatedFte?.annualSalaryPerFte, currencyConversionRate)),
+    description: process.description || "",
+    hoursPerYear: formatNumberInput(process.hoursPerYear),
+    name: process.name || process.processId || "",
+    processEfficiencyPercent: formatNumberInput(costInputs?.efficiencyPercent),
+    sharedAllocationPercent: formatNumberInput(sharedFtePool?.allocationPercent),
+    sharedFtes: formatNumberInput(sharedFtePool?.count),
+    sharedSalaryAed: formatNumberInput(getCurrencyAmountAed(sharedFtePool?.annualSalaryPerFte, currencyConversionRate)),
+    softwareCostAed: formatNumberInput(
+      getCurrencyAmountAed(costInputs?.nonStaffingAnnualCost, currencyConversionRate) ||
+        getProcessCost(process, currencyConversionRate),
+    ),
+    stack: (process.stack ?? []).join(", "),
+    tier: process.tier || "",
+  };
+}
+
+function calculateProcessFormCost(form: ProcessEditFormState) {
+  const sharedFtes = parseFormNumber(form.sharedFtes);
+  const sharedAllocationPercent = Math.min(100, parseFormNumber(form.sharedAllocationPercent));
+  const sharedSalaryAed = parseFormNumber(form.sharedSalaryAed);
+  const dedicatedFtes = parseFormNumber(form.dedicatedFtes);
+  const dedicatedSalaryAed = parseFormNumber(form.dedicatedSalaryAed);
+  const softwareCostAed = parseFormNumber(form.softwareCostAed);
+
+  return Math.max(
+    0,
+    Math.round(
+      softwareCostAed +
+        sharedFtes * (sharedAllocationPercent / 100) * sharedSalaryAed +
+        dedicatedFtes * dedicatedSalaryAed,
+    ),
+  );
+}
+
+function getProcessFormHours(form: ProcessEditFormState) {
+  const explicitHours = parseFormNumber(form.hoursPerYear);
+
+  if (explicitHours > 0) {
+    return Math.round(explicitHours);
+  }
+
+  const sharedFtes = parseFormNumber(form.sharedFtes);
+  const sharedAllocationPercent = Math.min(100, parseFormNumber(form.sharedAllocationPercent));
+  const dedicatedFtes = parseFormNumber(form.dedicatedFtes);
+  const totalFtes = sharedFtes * (sharedAllocationPercent / 100) + dedicatedFtes;
+
+  return Math.round(totalFtes * 2080);
+}
+
+function buildProcessUpdatePayload(
+  process: AdminAssessmentProcess,
+  form: ProcessEditFormState,
+): AdminAssessmentProcess {
+  const totalCostAed = calculateProcessFormCost(form);
+  const softwareCostAed = Math.round(parseFormNumber(form.softwareCostAed));
+  const efficiencyPercent = parseFormNumber(form.processEfficiencyPercent);
+  const sharedFtes = parseFormNumber(form.sharedFtes);
+  const sharedSalaryAed = Math.round(parseFormNumber(form.sharedSalaryAed));
+  const sharedAllocationPercent = Math.min(100, parseFormNumber(form.sharedAllocationPercent));
+  const dedicatedFtes = parseFormNumber(form.dedicatedFtes);
+  const dedicatedSalaryAed = Math.round(parseFormNumber(form.dedicatedSalaryAed));
+  const stack = form.stack
+    .split(/[,;\n]/)
+    .map((tool) => tool.trim())
+    .filter(Boolean);
+
+  return {
+    automationLevel: Math.min(5, Math.max(1, Math.round(parseFormNumber(form.automationLevel) || 1))),
+    category: form.category.trim(),
+    costInputs: {
+      dedicatedFte: {
+        annualSalaryPerFte: { amount: dedicatedSalaryAed, currency: "AED" },
+        count: dedicatedFtes,
+      },
+      efficiencyPercent,
+      nonStaffingAnnualCost: { amount: softwareCostAed, currency: "AED" },
+      sharedFtePool: {
+        allocationPercent: sharedAllocationPercent,
+        annualSalaryPerFte: { amount: sharedSalaryAed, currency: "AED" },
+        count: sharedFtes,
+      },
+    },
+    description: form.description.trim(),
+    estimatedCost: {
+      amount: totalCostAed,
+      baseAmount: { amount: totalCostAed, currency: "AED" },
+      currency: "AED",
+    },
+    hoursPerYear: getProcessFormHours(form),
+    id: process.id,
+    name: form.name.trim(),
+    source: process.source,
+    stack,
+    tier: form.tier.trim(),
+  };
+}
+
+function getProcessFteLabel(process: AdminAssessmentProcess) {
+  const sharedFtePool = process.costInputs?.sharedFtePool;
+  const dedicatedFte = process.costInputs?.dedicatedFte;
+  const sharedFtes = Number(sharedFtePool?.count) || 0;
+  const allocationPercent = Number(sharedFtePool?.allocationPercent) || 0;
+  const dedicatedFtes = Number(dedicatedFte?.count) || 0;
+  const totalFtes = sharedFtes * (allocationPercent / 100) + dedicatedFtes;
+
+  if (totalFtes > 0) {
+    return formatNumberInput(totalFtes);
+  }
+
+  return process.ftes || "--";
+}
+
+function getProcessSoftwareLabel(
+  process: AdminAssessmentProcess,
+  currencyConversionRate = defaultUsdToAedRate,
+) {
+  const softwareCost = getCurrencyAmountAed(
+    process.costInputs?.nonStaffingAnnualCost,
+    currencyConversionRate,
+  );
+
+  if (softwareCost > 0) {
+    return formatAedCurrency(softwareCost);
+  }
+
+  return process.software || "--";
+}
+
+function getProcessCost(
+  process: AdminAssessmentProcess,
+  currencyConversionRate = defaultUsdToAedRate,
+) {
   const explicitCost = parseMetricNumber(process.cost || "");
 
   if (explicitCost > 0) {
@@ -1539,14 +2263,16 @@ function getProcessCost(process: AdminAssessmentProcess) {
   const amount = Number(estimatedCost?.amount);
 
   if (Number.isFinite(amount) && amount > 0) {
-    return estimatedCost?.currency === "USD" ? Math.round(amount * 3.6725) : Math.round(amount);
+    return estimatedCost?.currency === "USD"
+      ? Math.round(amount * currencyConversionRate)
+      : Math.round(amount);
   }
 
   const baseAmount = Number(estimatedCost?.baseAmount?.amount);
 
   if (Number.isFinite(baseAmount) && baseAmount > 0) {
     return estimatedCost?.baseAmount?.currency === "USD"
-      ? Math.round(baseAmount * 3.6725)
+      ? Math.round(baseAmount * currencyConversionRate)
       : Math.round(baseAmount);
   }
 
@@ -1653,6 +2379,16 @@ function compareAssessmentSummaries(
     (parseMetricNumber(first[sortKey]) - parseMetricNumber(second[sortKey])) *
     directionMultiplier
   );
+}
+
+function getIndustryOptions(rows: AdminAssessmentRow[]) {
+  return getUniqueValues(rows.flatMap((row) => getAssessmentIndustries(row))).sort(
+    (first, second) => first.localeCompare(second),
+  );
+}
+
+function getAssessmentIndustries(row: Pick<AdminAssessmentRow, "industry">) {
+  return getUniqueValues(String(row.industry || "").split(",")).filter((industry) => industry !== "--");
 }
 
 function getUniqueOptions(rows: AdminAssessmentRow[], key: "industry" | "status") {

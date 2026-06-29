@@ -32,15 +32,69 @@ export type PipelineStatus = {
   tone: "gray" | "blueLight" | "blue" | "green" | "red";
 };
 
+export type DashboardAssessmentProcess = {
+  automation?: string;
+  automationLevel?: number;
+  category?: string;
+  cost?: string;
+  estimatedCost?: {
+    amount?: number;
+    baseAmount?: {
+      amount?: number;
+      currency?: string;
+    };
+    currency?: string;
+  };
+  id?: string;
+  name?: string;
+  processId?: string;
+  saving?: string;
+};
+
+export type DashboardSummary = {
+  activePipelineCount?: number;
+  averageDigitizationIndex?: number | null;
+  closedWonCount?: number;
+  totalCostAed?: number;
+  totalSavingsAed?: number;
+};
+
+export type DashboardCount = {
+  count: number;
+  label: string;
+};
+
+export type DashboardValue = {
+  label: string;
+  value: number;
+};
+
+export type DashboardTrendPoint = {
+  month: string;
+  value: number;
+};
+
 export type RecentAssessment = {
   company: string;
   contact: string;
   cost: string;
   createdAt?: string;
+  currencyConversionRate?: number;
+  domain?: string;
   id: string;
   industry: string;
+  owner?: string;
+  preferences?: {
+    aiPreference?: string;
+    companySize?: string;
+    deploymentPreference?: string;
+    magicQuadrant?: string;
+  };
+  processCount?: number;
+  processes?: DashboardAssessmentProcess[];
   savings: string;
   score: string;
+  selectedStackTools?: string[];
   status: string;
   statusKey?: string;
   updatedAt?: string;

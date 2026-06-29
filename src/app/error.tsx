@@ -2,7 +2,13 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, LayoutDashboard, RefreshCcw, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  LayoutDashboard,
+  RefreshCcw,
+  ShieldAlert,
+} from "lucide-react";
 
 export default function ErrorPage({
   error,
@@ -26,52 +32,67 @@ export default function ErrorPage({
         </div>
       </section>
 
-      <section className="flex min-h-screen flex-1 items-center justify-center px-5 py-10">
-        <div className="w-full max-w-[520px] rounded-md border border-black/[0.08] bg-white p-6 text-center shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-md bg-[#FEF2F2] text-[#EF4444]">
-            <ShieldAlert size={24} aria-hidden="true" />
+      <section className="flex min-h-screen flex-1 items-center justify-center bg-[#FAFAFA] px-5 py-10">
+        <div className="w-full max-w-[560px] overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center gap-3 border-b border-black/[0.06] bg-[#FCFCFD] px-5 py-4">
+            <div className="flex size-9 items-center justify-center rounded-md bg-[#FFF7ED] text-[#F97316]">
+              <AlertTriangle size={18} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] leading-4 font-bold tracking-[0.12em] text-[#86868B] uppercase">
+                Admin portal alert
+              </p>
+              <p className="truncate text-sm leading-5 font-bold text-[#171717]">
+                Page load interruption
+              </p>
+            </div>
           </div>
 
-          <p className="mt-5 text-[11px] font-bold tracking-[0.14em] text-[#86868B] uppercase">
-            Something went wrong
-          </p>
-          <h1 className="mt-2 text-[26px] leading-tight font-bold tracking-normal">
-            The admin page could not be loaded.
-          </h1>
-          <p className="mx-auto mt-3 max-w-[420px] text-sm leading-6 font-semibold text-[#86868B]">
-            Try again, go back to the previous page, or return to the dashboard.
-          </p>
-
-          {error.digest ? (
-            <p className="mt-4 rounded-md bg-[#F5F5F5] px-3 py-2 text-xs font-semibold text-[#86868B]">
-              Error reference: {error.digest}
+          <div className="px-5 py-6">
+            <h1 className="text-[26px] leading-tight font-bold tracking-normal text-[#171717]">
+              This admin page could not be loaded.
+            </h1>
+            <p className="mt-3 text-sm leading-6 font-semibold text-[#68686D]">
+              The page did not finish loading. Retry the page, go back, or open the dashboard to
+              continue working.
             </p>
-          ) : null}
 
-          <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              onClick={reset}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-[#007AFF] px-4 text-xs font-bold text-white transition hover:bg-[#006BE0]"
-            >
-              <RefreshCcw size={13} aria-hidden="true" />
-              Try Again
-            </button>
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-4 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF]"
-            >
-              <ArrowLeft size={13} aria-hidden="true" />
-              Go Back
-            </button>
-            <Link
-              href="/"
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-4 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF]"
-            >
-              <LayoutDashboard size={13} aria-hidden="true" />
-              Dashboard
-            </Link>
+            <div className="mt-5 rounded-md border border-black/[0.06] bg-[#FAFAFA] px-3 py-3">
+              <p className="text-xs leading-5 font-semibold text-[#555555]">
+                No admin changes were submitted from this failed page view.
+              </p>
+              {error.digest ? (
+                <p className="mt-2 break-all text-[11px] font-bold text-[#86868B]">
+                  Reference: {error.digest}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-[#007AFF] px-4 text-xs font-bold text-white transition hover:bg-[#006BE0]"
+              >
+                <RefreshCcw size={13} aria-hidden="true" />
+                Retry Page
+              </button>
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-4 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF]"
+              >
+                <ArrowLeft size={13} aria-hidden="true" />
+                Go Back
+              </button>
+              <Link
+                href="/"
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-black/[0.08] bg-white px-4 text-xs font-bold text-[#555555] transition hover:border-[#007AFF]/30 hover:text-[#007AFF]"
+              >
+                <LayoutDashboard size={13} aria-hidden="true" />
+                Dashboard
+              </Link>
+            </div>
           </div>
         </div>
       </section>

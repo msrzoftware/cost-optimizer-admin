@@ -60,7 +60,7 @@ export function AdminShell({
       <div className="grid min-h-screen lg:grid-cols-[220px_minmax(0,1fr)]">
         <Sidebar activeItem={activeItem} />
         <section className="min-w-0 bg-white">
-          <div className="px-4 py-8 sm:px-6 lg:mr-[18px] lg:ml-6 lg:max-w-none lg:px-0">
+          <div className="h-full px-4 pt-8 py-4 sm:px-6 lg:mr-[18px] lg:ml-6 lg:max-w-none lg:px-0">
             {children}
           </div>
         </section>
