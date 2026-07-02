@@ -111,6 +111,15 @@ type DataDictionaryProcessPayload = {
   tier: string;
 };
 
+type DataDictionaryTechStackPayload = {
+  category: string;
+  domainId?: string;
+  industryId?: string;
+  name: string;
+  scope?: "common" | "industry-default" | "industry-domain";
+  vendor: string;
+};
+
 export type DataDictionaryCatalog = {
   domains: DictionaryDomain[];
   industries: DictionaryIndustry[];
@@ -298,17 +307,22 @@ export async function createDataDictionaryTechStack(payload: {
   name: string;
   scope?: "common" | "industry-default" | "industry-domain";
   vendor: string;
-}) {
+}): Promise<string> {
   const tool = await fetchApi<ApiTechStack>(`${adminBasePath}/tech-stack`, {
-    body: JSON.stringify({
-      company: payload.vendor.trim(),
-      description: payload.category.trim(),
-      industryDomainId: payload.domainId,
-      industryId: payload.industryId,
-      scope: payload.scope,
-      title: payload.name.trim(),
-    }),
+    body: JSON.stringify(toApiTechStackPayload(payload)),
     method: "POST",
+  });
+
+  return getId(tool);
+}
+
+export async function updateDataDictionaryTechStack(payload: {
+  tool: TechStackTool;
+  values: DataDictionaryTechStackPayload;
+}) {
+  const tool = await fetchApi<ApiTechStack>(`${adminBasePath}/tech-stack/${payload.tool.id}`, {
+    body: JSON.stringify(toApiTechStackPayload(payload.values)),
+    method: "PUT",
   });
 
   return getId(tool);
@@ -365,6 +379,17 @@ export async function updateDataDictionaryCurrencyConversionRate(rate: number) {
 
   const savedRate = Number(result.currencyConversionRate);
   return Number.isFinite(savedRate) && savedRate > 0 ? savedRate : rate;
+}
+
+function toApiTechStackPayload(payload: DataDictionaryTechStackPayload) {
+  return {
+    company: payload.vendor.trim(),
+    description: payload.category.trim(),
+    industryDomainId: payload.domainId,
+    industryId: payload.industryId,
+    scope: payload.scope,
+    title: payload.name.trim(),
+  };
 }
 
 function mapCatalog(payload: ApiCatalogPayload = {}): DataDictionaryCatalog {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -54,7 +55,7 @@ const statusStyles = {
 } as const;
 
 const recentAssessmentGridClassName =
-  "xl:grid-cols-[minmax(220px,1.35fr)_126px_72px_118px_110px_220px_172px_16px]";
+  "xl:grid-cols-[minmax(205px,1.35fr)_112px_64px_108px_100px_168px_150px_14px]";
 
 const industryIconStyles: Record<string, { className: string; icon: LucideIcon; size?: number }> = {
   automotive: { className: "text-[#86868B]", icon: Car },
@@ -69,38 +70,40 @@ const industryIconStyles: Record<string, { className: string; icon: LucideIcon; 
 export function AdminDashboard() {
   return (
     <AdminShell activeItem="Dashboard">
-      <header>
-        <h1 className="text-[26px] leading-tight font-bold tracking-normal">Business Dashboard</h1>
-        <p className="mt-2 text-sm font-semibold text-[#86868B]">
-          Overview of every assessment submitted through the Enterprise Cost Optimizer.
-        </p>
-      </header>
+      <div>
+        <header>
+          <h1 className="text-[26px] leading-tight font-bold tracking-normal">Business Dashboard</h1>
+          <p className="mt-2 text-sm font-semibold text-[#86868B]">
+            Overview of every assessment submitted through the Enterprise Cost Optimizer.
+          </p>
+        </header>
 
-      <section className="mt-7 grid gap-5 xl:grid-cols-4" aria-label="Business dashboard summary">
-        <DashboardStatsCards />
-      </section>
+        <section className="mt-7 grid gap-5 xl:grid-cols-4" aria-label="Business dashboard summary">
+          <DashboardStatsCards />
+        </section>
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-2" aria-label="Pipeline distribution">
-        <PipelineStatusCard />
-        <IndustryBreakdownCard />
-      </section>
+        <section className="mt-5 grid gap-5 xl:grid-cols-2" aria-label="Pipeline distribution">
+          <PipelineStatusCard />
+          <IndustryBreakdownCard />
+        </section>
 
-      <section
-        className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.42fr)_minmax(360px,1fr)]"
-        aria-label="Pipeline trend and value"
-      >
-        <AssessmentTrendCard />
-        <WeightedPipelineCard />
-      </section>
+        <section
+          className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.42fr)_minmax(360px,1fr)]"
+          aria-label="Pipeline trend and value"
+        >
+          <AssessmentTrendCard />
+          <WeightedPipelineCard />
+        </section>
 
-      <PipelineConversionCard />
+        <PipelineConversionCard />
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-2" aria-label="Portfolio signals">
-        <CompanySizeCard />
-        <SelectedProcessesCard />
-      </section>
+        <section className="mt-5 grid gap-5 xl:grid-cols-2" aria-label="Portfolio signals">
+          <CompanySizeCard />
+          <SelectedProcessesCard />
+        </section>
 
-      <RecentAssessmentsList />
+        <RecentAssessmentsList />
+      </div>
     </AdminShell>
   );
 }
@@ -128,7 +131,7 @@ function DashboardStatsCards() {
           <p className="text-[10px] font-bold tracking-[0.14em] text-[#A1A1AA] uppercase">
             {stat.label}
           </p>
-          <p className={`mt-4 text-[30px] leading-none font-bold ${statToneStyles[stat.tone]}`}>
+          <p className={`!mt-4 text-[30px] leading-none font-bold ${statToneStyles[stat.tone]}`}>
             {isLoading ? "--" : stat.value}
           </p>
           <p className="mt-2 text-xs font-semibold text-[#86868B]">
@@ -458,13 +461,13 @@ function RecentAssessmentsList() {
         <p className="text-[10px] leading-none font-bold tracking-[0.12em] text-[#86868B] uppercase">
           Recently Updated
         </p>
-        <button
-          type="button"
+        <Link
+          href="/assessments"
           className="inline-flex items-center gap-1 text-xs leading-none font-bold text-[#007AFF]"
         >
           View all
           <ArrowRight size={12} aria-hidden="true" />
-        </button>
+        </Link>
       </div>
 
       <div
@@ -509,9 +512,11 @@ function RecentAssessmentsList() {
           const owner = normalizeDashboardLabel(assessment.owner);
 
           return (
-            <article
+            <Link
               key={assessment.id}
-              className={`grid min-h-[60px] gap-4 rounded-md border border-black/[0.08] bg-white px-5 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ${recentAssessmentGridClassName} xl:items-center`}
+              href={getRecentAssessmentHighlightHref(assessment)}
+              className={`recent-assessment-card grid min-h-[60px] gap-4 rounded-md border border-black/[0.08] bg-white px-5 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ${recentAssessmentGridClassName} xl:items-center`}
+              aria-label={`Open ${assessment.company} in assessments`}
             >
               <div>
                 <p className="truncate text-sm leading-[1.2] font-bold text-[#171717]">{assessment.company}</p>
@@ -550,14 +555,10 @@ function RecentAssessmentsList() {
                 </div>
               </div>
               <StatusPill label={assessment.status} tone={statusTone} />
-              <button
-                type="button"
-                className="hidden text-[#C1C7D0] xl:block"
-                aria-label={`Open ${assessment.company}`}
-              >
+              <span className="hidden text-[#C1C7D0] xl:block" aria-hidden="true">
                 <ArrowRight size={14} aria-hidden="true" />
-              </button>
-            </article>
+              </span>
+            </Link>
           );
         })}
       </div>
@@ -1060,6 +1061,31 @@ function getRecentAssessmentTime(assessment: RecentAssessment) {
   const time = new Date(assessment.updatedAt || assessment.createdAt || "").getTime();
 
   return Number.isFinite(time) ? time : 0;
+}
+
+function getRecentAssessmentHighlightHref(assessment: RecentAssessment) {
+  const contactEmail = getContactEmail(assessment.contact);
+  const highlightKey = getRouteSlug(
+    contactEmail || `${assessment.company}-${assessment.contact}` || assessment.id,
+  );
+
+  return highlightKey
+    ? `/assessments?assessment=${encodeURIComponent(highlightKey)}`
+    : "/assessments";
+}
+
+function getContactEmail(value: string) {
+  return value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+}
+
+function getRouteSlug(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
 }
 
 function formatRecentAssessmentUpdatedAt(assessment: RecentAssessment) {

@@ -53,33 +53,35 @@ const experts: Expert[] = [
 export function ExpertsPage() {
   return (
     <AdminShell activeItem="Experts">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] leading-tight font-bold tracking-normal text-[#171717]">
-            Experts
-          </h1>
-          <p className="mt-2 text-sm leading-none font-semibold text-[#86868B]">
-            Consultants available for booking from the Expert tab.
-          </p>
-        </div>
+      <div>
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[26px] leading-tight font-bold tracking-normal text-[#171717]">
+              Experts
+            </h1>
+            <p className="mt-2 text-sm leading-none font-semibold text-[#86868B]">
+              Consultants available for booking from the Expert tab.
+            </p>
+          </div>
 
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-2 rounded-md bg-[#007AFF] px-4 text-xs font-bold text-white shadow-[0_1px_2px_rgba(0,122,255,0.18)] transition hover:bg-[#006FE8]"
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-[#007AFF] px-4 text-xs font-bold text-white shadow-[0_1px_2px_rgba(0,122,255,0.18)] transition hover:bg-[#006FE8]"
+          >
+            <Plus size={13} strokeWidth={2.2} aria-hidden="true" />
+            Add Expert
+          </button>
+        </header>
+
+        <section
+          aria-label="Expert consultants"
+          className="mt-[31px] grid gap-5 xl:grid-cols-3"
         >
-          <Plus size={13} strokeWidth={2.2} aria-hidden="true" />
-          Add Expert
-        </button>
-      </header>
-
-      <section
-        aria-label="Expert consultants"
-        className="mt-[31px] grid gap-5 xl:grid-cols-3"
-      >
-        {experts.map((expert) => (
-          <ExpertCard expert={expert} key={expert.name} />
-        ))}
-      </section>
+          {experts.map((expert) => (
+            <ExpertCard expert={expert} key={expert.name} />
+          ))}
+        </section>
+      </div>
     </AdminShell>
   );
 }

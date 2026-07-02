@@ -2,15 +2,14 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  Archive,
   BookOpen,
   ChevronDown,
   ClipboardCheck,
   LogOut,
   LayoutDashboard,
-  Search,
   Settings,
   ShieldCheck,
-  Trash2,
   UserRound,
   Users,
 } from "lucide-react";
@@ -24,11 +23,10 @@ import type { AdminUser } from "@/lib/auth/storage";
 type NavigationLabel =
   | "Dashboard"
   | "Assessments"
-  | "Search"
   | "Data Dictionary"
   | "Experts"
   | "Team"
-  | "Trash"
+  | "Archive"
   | "Settings";
 
 type NavigationItem = {
@@ -40,11 +38,10 @@ type NavigationItem = {
 const navigationItems: readonly NavigationItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Assessments", href: "/assessments", icon: ClipboardCheck },
-  { label: "Search", href: "#search", icon: Search },
   { label: "Data Dictionary", href: "/data-dictionary", icon: BookOpen },
   { label: "Experts", href: "/experts", icon: Users },
   { label: "Team", href: "#team", icon: UserRound },
-  { label: "Trash", href: "#trash", icon: Trash2 },
+  { label: "Archive", href: "#archive", icon: Archive },
   { label: "Settings", href: "#settings", icon: Settings },
 ];
 
@@ -60,7 +57,7 @@ export function AdminShell({
       <div className="grid min-h-screen lg:grid-cols-[220px_minmax(0,1fr)]">
         <Sidebar activeItem={activeItem} />
         <section className="min-w-0 bg-white">
-          <div className="h-full px-4 pt-8 py-4 sm:px-6 lg:mr-[18px] lg:ml-6 lg:max-w-none lg:px-0">
+          <div className="h-full px-4 pt-8 pb-4 sm:px-6 lg:ml-6 lg:max-w-none lg:px-0">
             {children}
           </div>
         </section>
@@ -126,9 +123,9 @@ function Sidebar({ activeItem }: { activeItem: NavigationLabel }) {
         })}
       </nav>
 
-      <div className="relative mt-auto border-t border-black/[0.08] p-4">
+      <div className="relative mt-auto min-h-[93px] border-t border-black/[0.08] px-5 py-4">
         {showProfileMenu ? (
-          <div className="absolute right-3 bottom-[72px] left-3 rounded-md border border-black/[0.08] bg-white p-1 shadow-[0_8px_30px_rgba(15,23,42,0.12)]">
+          <div className="absolute right-3 bottom-[96px] left-3 rounded-md border border-black/[0.08] bg-white p-1 shadow-[0_8px_30px_rgba(15,23,42,0.12)]">
             <button
               type="button"
               className="flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-bold text-[#EF4444] transition hover:bg-[#FEF2F2]"
@@ -142,7 +139,7 @@ function Sidebar({ activeItem }: { activeItem: NavigationLabel }) {
 
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md text-left"
+          className="flex w-full items-center gap-2.5 rounded-md text-left"
           aria-expanded={showProfileMenu}
           aria-haspopup="menu"
           onClick={() => setShowProfileMenu((currentValue) => !currentValue)}

@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   Plus,
   RotateCcw,
+  Pencil,
   Search,
   Table2,
   Trash2,
@@ -52,6 +53,7 @@ import {
   reorderDataDictionaryDomains,
   reorderDataDictionaryIndustries,
   updateDataDictionaryCurrencyConversionRate,
+  updateDataDictionaryTechStack,
   updateDataDictionaryProcess,
   updateDataDictionaryProcessStatus,
 } from "@/api/data-dictionary.api";
@@ -152,6 +154,20 @@ function createProcessFormFromProcess(
   };
 }
 
+function createToolFormFromTool(tool: TechStackTool, industries: DictionaryIndustry[]): ToolFormState {
+  const scope =
+    tool.scope === "industry-domain" ? "domain" : tool.scope === "industry-default" ? "industry" : "common";
+
+  return {
+    category: tool.category,
+    domainId: scope === "domain" ? tool.domainId || "" : "",
+    industryId: scope === "common" ? "" : tool.industryId || industries[0]?.id || "",
+    name: tool.name,
+    scope,
+    vendor: tool.vendor,
+  };
+}
+
 export function DataDictionaryPage() {
   const queryClient = useQueryClient();
   const [industryName, setIndustryName] = useState("");
@@ -177,6 +193,7 @@ export function DataDictionaryPage() {
   const [savedUsdToAedRateOverride, setSavedUsdToAedRateOverride] = useState<number | null>(null);
   const [toolForm, setToolForm] = useState<ToolFormState>(emptyToolForm);
   const [toolActionId, setToolActionId] = useState("");
+  const [editingTool, setEditingTool] = useState<TechStackTool | null>(null);
   const [toolDeleteTarget, setToolDeleteTarget] = useState<TechStackTool | null>(null);
   const [expandedProcessId, setExpandedProcessId] = useState(initialExpandedProcessId);
   const [dictionaryError, setDictionaryError] = useState("");
@@ -233,6 +250,9 @@ export function DataDictionaryPage() {
   const createTechStackMutation = useMutation({
     mutationFn: createDataDictionaryTechStack,
   });
+  const updateTechStackMutation = useMutation({
+    mutationFn: updateDataDictionaryTechStack,
+  });
   const deleteTechStackMutation = useMutation({
     mutationFn: deleteDataDictionaryTechStack,
   });
@@ -254,6 +274,7 @@ export function DataDictionaryPage() {
     createIndustryProcessMutation.isPending ||
     createDomainProcessMutation.isPending ||
     updateProcessMutation.isPending;
+  const isToolSaving = createTechStackMutation.isPending || updateTechStackMutation.isPending;
   const dictionaryErrorMessage =
     dictionaryError || (dictionaryQueryError ? getErrorMessage(dictionaryQueryError) : "");
   const savedUsdToAedRate =
@@ -667,7 +688,19 @@ export function DataDictionaryPage() {
     try {
       setDictionaryError("");
 
-      if (toolForm.scope === "common") {
+      if (editingTool) {
+        setToolActionId(editingTool.id);
+        await updateTechStackMutation.mutateAsync({
+          tool: editingTool,
+          values: {
+            category,
+            name,
+            vendor,
+          },
+        });
+        setEditingTool(null);
+        setToolActionId("");
+      } else if (toolForm.scope === "common") {
         await createTechStackMutation.mutateAsync({
           category,
           name,
@@ -706,7 +739,26 @@ export function DataDictionaryPage() {
       setIsToolFormOpen(false);
     } catch (error) {
       setDictionaryError(getErrorMessage(error));
+      setToolActionId("");
     }
+  }
+
+  function handleOpenNewToolForm() {
+    setEditingTool(null);
+    setToolForm(emptyToolForm);
+    setIsToolFormOpen(true);
+  }
+
+  function handleCloseToolForm() {
+    setEditingTool(null);
+    setToolForm(emptyToolForm);
+    setIsToolFormOpen(false);
+  }
+
+  function handleEditTool(tool: TechStackTool) {
+    setEditingTool(tool);
+    setToolForm(createToolFormFromTool(tool, industries));
+    setIsToolFormOpen(true);
   }
 
   function handleDeleteTool(tool: TechStackTool) {
@@ -726,6 +778,9 @@ export function DataDictionaryPage() {
       await deleteTechStackMutation.mutateAsync(tool.id);
       await queryClient.invalidateQueries({ queryKey: dataDictionaryQueryKey });
       setToolDeleteTarget(null);
+      if (editingTool?.id === tool.id) {
+        handleCloseToolForm();
+      }
     } catch (error) {
       setDictionaryError(getErrorMessage(error));
     } finally {
@@ -749,143 +804,148 @@ export function DataDictionaryPage() {
 
   return (
     <AdminShell activeItem="Data Dictionary">
-      <PageHeader />
-      <section className="mt-7 grid gap-5 xl:grid-cols-2" aria-label="Reference scales">
-        <AutomationLevelsCard />
-        <ProcessTiersCard />
-      </section>
-      <BenchmarkCard />
-      <IndustryDomainManager
-        domainName={domainName}
-        domains={domains}
-        industryName={industryName}
-        industries={industries}
-        isCatalogLoading={isCatalogLoading}
-        isDomainSaving={createDomainMutation.isPending}
-        isDeletingDomain={deleteProcessLibraryMutation.isPending}
-        isDeletingIndustry={deleteIndustryMutation.isPending}
-        isIndustrySaving={createIndustryMutation.isPending || activateIndustryMutation.isPending}
-        isMappingDomain={createProcessLibraryMutation.isPending}
-        libraries={libraries}
-        inactiveIndustries={inactiveIndustries}
-        mappingIndustryId={mappingIndustryId}
-        processes={processes}
-        setDomainIndustryId={setDomainIndustryId}
-        setDomainName={setDomainName}
-        setIndustryName={setIndustryName}
-        setMappingIndustryId={setMappingIndustryId}
-        onAddDomain={handleAddDomain}
-        onAddIndustry={handleAddIndustry}
-        onActivateIndustry={handleActivateIndustry}
-        onDeleteDomain={handleDeleteDomain}
-        onDeleteIndustry={handleDeleteIndustry}
-        onMapDomain={handleMapDomain}
-        onMapDomainToIndustry={handleMapDomainToIndustry}
-        onReorderDomains={handleReorderDomains}
-        onReorderIndustries={handleReorderIndustries}
-      />
-      <ProcessLibraryCard
-        domains={domains}
-        dictionaryError={dictionaryErrorMessage}
-        expandedProcessId={activeExpandedProcessId}
-        filteredProcesses={filteredProcesses}
-        industries={industries}
-        isCatalogLoading={isCatalogLoading}
-        isProcessSaving={isProcessSaving}
-        isProcessFormOpen={isProcessFormOpen}
-        categoryOptions={categoryOptions}
-        tierOptions={tierOptions}
-        editingProcess={editingProcess}
-        processDomainFilter={processDomainFilter}
-        processForm={processForm}
-        processActionId={processActionId}
-        processIndustryFilter={processIndustryFilter}
-        processPage={processPage}
-        processSearch={processSearch}
-        processes={processes}
-        setExpandedProcessId={setExpandedProcessId}
-        setIsProcessFormOpen={setIsProcessFormOpen}
-        setProcessDomainFilter={(value) => {
-          setProcessPage(1);
-          setProcessDomainFilter(value);
-        }}
-        setProcessForm={setProcessForm}
-        setProcessIndustryFilter={(value) => {
-          setProcessPage(1);
-          setProcessIndustryFilter(value);
-        }}
-        setProcessPage={setProcessPage}
-        setProcessSearch={(value) => {
-          setProcessPage(1);
-          setProcessSearch(value);
-        }}
-        onAddProcess={handleAddProcess}
-        currencyRateInput={currencyRateValue}
-        isCurrencyRateSaving={updateCurrencyConversionRateMutation.isPending}
-        savedUsdToAedRate={savedUsdToAedRate}
-        setCurrencyRateInput={setCurrencyRateInput}
-        onSaveCurrencyRate={handleSaveCurrencyRate}
-        onDeleteProcess={handleDeleteProcess}
-        onEditProcess={handleEditProcess}
-        onOpenNewProcessForm={handleOpenNewProcessForm}
-        onToggleProcessStatus={handleToggleProcessStatus}
-      />
-      <TechnologyStackCard
-        domains={domains}
-        filteredTools={filteredTools}
-        industries={industries}
-        isCatalogLoading={isCatalogLoading}
-        isToolDeleting={deleteTechStackMutation.isPending}
-        isToolFormOpen={isToolFormOpen}
-        isToolSaving={createTechStackMutation.isPending}
-        setIsToolFormOpen={setIsToolFormOpen}
-        setToolForm={setToolForm}
-        setToolPage={setToolPage}
-        setToolScopeFilter={(value) => {
-          setToolPage(1);
-          setToolScopeFilter(value);
-        }}
-        setToolSearch={(value) => {
-          setToolPage(1);
-          setToolSearch(value);
-        }}
-        toolForm={toolForm}
-        toolActionId={toolActionId}
-        toolPage={toolPage}
-        toolScopeFilter={toolScopeFilter}
-        toolSearch={toolSearch}
-        tools={tools}
-        onAddTool={handleAddTool}
-        onDeleteTool={handleDeleteTool}
-      />
-      {processDeleteTarget ? (
-        <DeleteProcessConfirmationModal
-          isDeleting={deleteProcessMutation.isPending && processActionId === processDeleteTarget.id}
-          process={processDeleteTarget}
-          onCancel={() => {
-            if (!deleteProcessMutation.isPending) {
-              setProcessDeleteTarget(null);
-            }
-          }}
-          onConfirm={() => {
-            void confirmDeleteProcess();
-          }}
+      <div>
+        <PageHeader />
+        <section className="mt-7 grid gap-5 xl:grid-cols-2" aria-label="Reference scales">
+          <AutomationLevelsCard />
+          <ProcessTiersCard />
+        </section>
+        <BenchmarkCard />
+        <IndustryDomainManager
+          domainName={domainName}
+          domains={domains}
+          industryName={industryName}
+          industries={industries}
+          isCatalogLoading={isCatalogLoading}
+          isDomainSaving={createDomainMutation.isPending}
+          isDeletingDomain={deleteProcessLibraryMutation.isPending}
+          isDeletingIndustry={deleteIndustryMutation.isPending}
+          isIndustrySaving={createIndustryMutation.isPending || activateIndustryMutation.isPending}
+          isMappingDomain={createProcessLibraryMutation.isPending}
+          libraries={libraries}
+          inactiveIndustries={inactiveIndustries}
+          mappingIndustryId={mappingIndustryId}
+          processes={processes}
+          setDomainIndustryId={setDomainIndustryId}
+          setDomainName={setDomainName}
+          setIndustryName={setIndustryName}
+          setMappingIndustryId={setMappingIndustryId}
+          onAddDomain={handleAddDomain}
+          onAddIndustry={handleAddIndustry}
+          onActivateIndustry={handleActivateIndustry}
+          onDeleteDomain={handleDeleteDomain}
+          onDeleteIndustry={handleDeleteIndustry}
+          onMapDomain={handleMapDomain}
+          onMapDomainToIndustry={handleMapDomainToIndustry}
+          onReorderDomains={handleReorderDomains}
+          onReorderIndustries={handleReorderIndustries}
         />
-      ) : null}
-      {toolDeleteTarget ? (
-        <DeleteToolConfirmationModal
-          isDeleting={deleteTechStackMutation.isPending && toolActionId === toolDeleteTarget.id}
-          tool={toolDeleteTarget}
-          onCancel={() => {
-            if (!deleteTechStackMutation.isPending) {
-              setToolDeleteTarget(null);
-            }
+        <ProcessLibraryCard
+          domains={domains}
+          dictionaryError={dictionaryErrorMessage}
+          expandedProcessId={activeExpandedProcessId}
+          filteredProcesses={filteredProcesses}
+          industries={industries}
+          isCatalogLoading={isCatalogLoading}
+          isProcessSaving={isProcessSaving}
+          isProcessFormOpen={isProcessFormOpen}
+          categoryOptions={categoryOptions}
+          tierOptions={tierOptions}
+          editingProcess={editingProcess}
+          processDomainFilter={processDomainFilter}
+          processForm={processForm}
+          processActionId={processActionId}
+          processIndustryFilter={processIndustryFilter}
+          processPage={processPage}
+          processSearch={processSearch}
+          processes={processes}
+          setExpandedProcessId={setExpandedProcessId}
+          setIsProcessFormOpen={setIsProcessFormOpen}
+          setProcessDomainFilter={(value) => {
+            setProcessPage(1);
+            setProcessDomainFilter(value);
           }}
-          onConfirm={() => {
-            void confirmDeleteTool();
+          setProcessForm={setProcessForm}
+          setProcessIndustryFilter={(value) => {
+            setProcessPage(1);
+            setProcessIndustryFilter(value);
           }}
+          setProcessPage={setProcessPage}
+          setProcessSearch={(value) => {
+            setProcessPage(1);
+            setProcessSearch(value);
+          }}
+          onAddProcess={handleAddProcess}
+          currencyRateInput={currencyRateValue}
+          isCurrencyRateSaving={updateCurrencyConversionRateMutation.isPending}
+          savedUsdToAedRate={savedUsdToAedRate}
+          setCurrencyRateInput={setCurrencyRateInput}
+          onSaveCurrencyRate={handleSaveCurrencyRate}
+          onDeleteProcess={handleDeleteProcess}
+          onEditProcess={handleEditProcess}
+          onOpenNewProcessForm={handleOpenNewProcessForm}
+          onToggleProcessStatus={handleToggleProcessStatus}
         />
-      ) : null}
+        <TechnologyStackCard
+          domains={domains}
+          filteredTools={filteredTools}
+          industries={industries}
+          isCatalogLoading={isCatalogLoading}
+          isToolDeleting={deleteTechStackMutation.isPending}
+          isToolFormOpen={isToolFormOpen}
+          isToolSaving={isToolSaving}
+          setToolForm={setToolForm}
+          setToolPage={setToolPage}
+          setToolScopeFilter={(value) => {
+            setToolPage(1);
+            setToolScopeFilter(value);
+          }}
+          setToolSearch={(value) => {
+            setToolPage(1);
+            setToolSearch(value);
+          }}
+          toolForm={toolForm}
+          toolActionId={toolActionId}
+          toolPage={toolPage}
+          toolScopeFilter={toolScopeFilter}
+          toolSearch={toolSearch}
+          tools={tools}
+          editingTool={editingTool}
+          onAddTool={handleAddTool}
+          onCloseToolForm={handleCloseToolForm}
+          onDeleteTool={handleDeleteTool}
+          onEditTool={handleEditTool}
+          onOpenNewToolForm={handleOpenNewToolForm}
+        />
+        {processDeleteTarget ? (
+          <DeleteProcessConfirmationModal
+            isDeleting={deleteProcessMutation.isPending && processActionId === processDeleteTarget.id}
+            process={processDeleteTarget}
+            onCancel={() => {
+              if (!deleteProcessMutation.isPending) {
+                setProcessDeleteTarget(null);
+              }
+            }}
+            onConfirm={() => {
+              void confirmDeleteProcess();
+            }}
+          />
+        ) : null}
+        {toolDeleteTarget ? (
+          <DeleteToolConfirmationModal
+            isDeleting={deleteTechStackMutation.isPending && toolActionId === toolDeleteTarget.id}
+            tool={toolDeleteTarget}
+            onCancel={() => {
+              if (!deleteTechStackMutation.isPending) {
+                setToolDeleteTarget(null);
+              }
+            }}
+            onConfirm={() => {
+              void confirmDeleteTool();
+            }}
+          />
+        ) : null}
+      </div>
     </AdminShell>
   );
 }
@@ -3030,7 +3090,7 @@ function ProcessRow({
                 onToggleStatus();
               }}
               disabled={isBusy}
-              className={`w-[72px] rounded-full py-1 text-right text-xs! font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`w-[72px] rounded-full py-1 text-right text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 isActive
                   ? "text-[#10B981]"
                   : "text-[#86868B] hover:text-[#555555]"
@@ -3113,7 +3173,6 @@ function TechnologyStackCard({
   isToolDeleting,
   isToolFormOpen,
   isToolSaving,
-  setIsToolFormOpen,
   setToolForm,
   setToolPage,
   setToolScopeFilter,
@@ -3124,8 +3183,12 @@ function TechnologyStackCard({
   toolScopeFilter,
   toolSearch,
   tools,
+  editingTool,
   onAddTool,
+  onCloseToolForm,
   onDeleteTool,
+  onEditTool,
+  onOpenNewToolForm,
 }: {
   domains: DictionaryDomain[];
   filteredTools: TechStackTool[];
@@ -3134,7 +3197,6 @@ function TechnologyStackCard({
   isToolDeleting: boolean;
   isToolFormOpen: boolean;
   isToolSaving: boolean;
-  setIsToolFormOpen: (value: boolean) => void;
   setToolForm: (value: ToolFormState | ((current: ToolFormState) => ToolFormState)) => void;
   setToolPage: (value: number) => void;
   setToolScopeFilter: (value: string) => void;
@@ -3145,8 +3207,12 @@ function TechnologyStackCard({
   toolScopeFilter: string;
   toolSearch: string;
   tools: TechStackTool[];
+  editingTool: TechStackTool | null;
   onAddTool: (event: FormEvent<HTMLFormElement>) => void;
+  onCloseToolForm: () => void;
   onDeleteTool: (tool: TechStackTool) => void;
+  onEditTool: (tool: TechStackTool) => void;
+  onOpenNewToolForm: () => void;
 }) {
   const totalToolPages = Math.ceil(filteredTools.length / libraryPageSize);
   const safeToolPage = Math.min(Math.max(toolPage, 1), Math.max(totalToolPages, 1));
@@ -3156,11 +3222,13 @@ function TechnologyStackCard({
   const toolDomains = domains.filter((domain) =>
     selectedToolIndustryId ? domain.industryIds.includes(selectedToolIndustryId) : true,
   );
+  const isEditingTool = Boolean(editingTool);
   const canAddTool = Boolean(
     toolForm.name.trim() &&
       toolForm.vendor.trim() &&
       toolForm.category.trim() &&
-      (toolForm.scope === "common" ||
+      (isEditingTool ||
+        toolForm.scope === "common" ||
         (toolForm.scope === "industry" && selectedToolIndustryId) ||
         (toolForm.scope === "domain" && selectedToolIndustryId && toolForm.domainId)),
   );
@@ -3170,7 +3238,7 @@ function TechnologyStackCard({
       className="mt-5 min-h-[313px]"
       title={`Technology Stack Library (${tools.length} of 50)`}
       actionLabel="Add Tool"
-      onAction={() => setIsToolFormOpen(true)}
+      onAction={onOpenNewToolForm}
     >
       {isCatalogLoading ? (
         <TechnologyStackSkeleton />
@@ -3200,8 +3268,9 @@ function TechnologyStackCard({
               domains={toolDomains}
               industries={industries}
               isToolSaving={isToolSaving}
+              editingTool={editingTool}
               selectedIndustryId={selectedToolIndustryId}
-              setIsToolFormOpen={setIsToolFormOpen}
+              onClose={onCloseToolForm}
               setToolForm={setToolForm}
               toolForm={toolForm}
               onAddTool={onAddTool}
@@ -3211,7 +3280,7 @@ function TechnologyStackCard({
             {visibleTools.map((tool) => (
               <article
                 key={tool.id}
-                className="relative min-h-[82px] rounded-md border border-black/[0.08] bg-white px-4 py-3 pr-11"
+                className="relative min-h-[82px] rounded-md border border-black/[0.08] bg-white px-4 py-3 pr-20"
               >
                 <p className="text-sm font-bold">{tool.name}</p>
                 <p className="mt-1 text-xs font-semibold text-[#86868B]">
@@ -3219,9 +3288,23 @@ function TechnologyStackCard({
                 </p>
                 <button
                   type="button"
+                  aria-label={`Edit ${tool.name}`}
+                  title={`Edit ${tool.name}`}
+                  disabled={isToolDeleting || isToolSaving}
+                  onClick={() => onEditTool(tool)}
+                  className="absolute top-3 right-11 inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#007AFF] focus-visible:bg-[#F5F5F7] focus-visible:text-[#007AFF] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {toolActionId === tool.id && isToolSaving ? (
+                    <span className="size-3 animate-spin rounded-full border border-[#86868B]/30 border-t-[#007AFF]" />
+                  ) : (
+                    <Pencil size={14} aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  type="button"
                   aria-label={`Delete ${tool.name}`}
                   title={`Delete ${tool.name}`}
-                  disabled={isToolDeleting}
+                  disabled={isToolDeleting || isToolSaving}
                   onClick={() => onDeleteTool(tool)}
                   className="absolute top-3 right-3 inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#EF4444] focus-visible:bg-[#F5F5F7] focus-visible:text-[#EF4444] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -3281,8 +3364,9 @@ function TechStackToolModal({
   domains,
   industries,
   isToolSaving,
+  editingTool,
   selectedIndustryId,
-  setIsToolFormOpen,
+  onClose,
   setToolForm,
   toolForm,
   onAddTool,
@@ -3291,8 +3375,9 @@ function TechStackToolModal({
   domains: DictionaryDomain[];
   industries: DictionaryIndustry[];
   isToolSaving: boolean;
+  editingTool: TechStackTool | null;
   selectedIndustryId: string;
-  setIsToolFormOpen: (value: boolean) => void;
+  onClose: () => void;
   setToolForm: (value: ToolFormState | ((current: ToolFormState) => ToolFormState)) => void;
   toolForm: ToolFormState;
   onAddTool: (event: FormEvent<HTMLFormElement>) => void;
@@ -3308,9 +3393,10 @@ function TechStackToolModal({
 
   function closeToolForm() {
     if (!isToolSaving) {
-      setIsToolFormOpen(false);
+      onClose();
     }
   }
+  const isEditingTool = Boolean(editingTool);
 
   return (
     <div
@@ -3328,13 +3414,13 @@ function TechStackToolModal({
       >
         <div className="flex items-center justify-between gap-4">
           <p id="new-tech-stack-title" className="text-sm font-bold text-[#171717]">
-            Add Tool
+            {isEditingTool ? "Edit Tool" : "Add Tool"}
           </p>
           <button
             type="button"
             onClick={closeToolForm}
             className="text-[#A1A1AA] transition hover:text-[#555555]"
-            aria-label="Close add tool form"
+            aria-label="Close tool form"
           >
             <X size={16} aria-hidden="true" />
           </button>
@@ -3373,6 +3459,7 @@ function TechStackToolModal({
           <Field label="Scope" required>
             <select
               value={toolForm.scope}
+              disabled={isEditingTool}
               onChange={(event) =>
                 setToolForm((current) => ({
                   ...current,
@@ -3391,6 +3478,7 @@ function TechStackToolModal({
             <Field label="Industry" required>
               <select
                 value={selectedIndustryId}
+                disabled={isEditingTool}
                 onChange={(event) =>
                   setToolForm((current) => ({
                     ...current,
@@ -3413,6 +3501,7 @@ function TechStackToolModal({
             <Field label="Domain" required>
               <select
                 value={toolForm.domainId}
+                disabled={isEditingTool}
                 onChange={(event) =>
                   setToolForm((current) => ({ ...current, domainId: event.target.value }))
                 }
@@ -3446,8 +3535,8 @@ function TechStackToolModal({
                 : "cursor-not-allowed bg-[#E5E5E7] text-[#86868B]"
             }`}
           >
-            <Plus size={13} aria-hidden="true" />
-            {isToolSaving ? "Saving..." : "Add Tool"}
+            {isEditingTool ? <Check size={13} aria-hidden="true" /> : <Plus size={13} aria-hidden="true" />}
+            {isToolSaving ? "Saving..." : isEditingTool ? "Save Changes" : "Add Tool"}
           </button>
         </div>
       </form>

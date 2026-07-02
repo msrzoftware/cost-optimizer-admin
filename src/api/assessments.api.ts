@@ -6,6 +6,7 @@ export type AdminAssessmentRow = {
   cost: string;
   createdAt?: string;
   currencyConversionRate?: number;
+  customProcesses?: AdminAssessmentProcess[];
   domain?: string;
   id: string;
   industry: string;
@@ -118,13 +119,18 @@ export async function fetchAdminAssessments(): Promise<AdminAssessmentsPayload> 
 
   const data = body?.data ?? {};
   const assessments = Array.isArray(data.recentAssessments)
-    ? data.recentAssessments.map((assessment) => ({
-        ...assessment,
-        processes: (assessment.processes ?? []).map((process) => ({
-          ...process,
-          assessmentId: assessment.id,
-        })),
-      }))
+    ? data.recentAssessments.map((assessment) => {
+        const processes = mapAssessmentProcesses(assessment.processes, assessment.id);
+        const customProcesses = mapAssessmentProcesses(assessment.customProcesses, assessment.id);
+
+        return {
+          ...assessment,
+          customProcesses: customProcesses.length
+            ? customProcesses
+            : processes.filter(isFrontendCustomAssessmentProcess),
+          processes,
+        };
+      })
     : [];
 
   return {
@@ -164,6 +170,20 @@ export async function updateAdminAssessmentProcess(
   if (!response.ok || body?.success === false || body?.status === false) {
     throw new Error(body?.message || "Unable to update assessment process");
   }
+}
+
+function mapAssessmentProcesses(
+  processes: AdminAssessmentProcess[] | undefined,
+  assessmentId: string,
+) {
+  return (processes ?? []).map((process) => ({
+    ...process,
+    assessmentId,
+  }));
+}
+
+function isFrontendCustomAssessmentProcess(process: AdminAssessmentProcess) {
+  return String(process.source || "").trim().toLowerCase() === "industry-domain-custom";
 }
 
 function getRequestHeaders() {

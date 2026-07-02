@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -66,6 +66,7 @@ type AssessmentSummary = {
   cost: string;
   createdAt?: string;
   currencyConversionRate: number;
+  customProcesses: AdminAssessmentProcess[];
   domain: string;
   id: string;
   industry: string;
@@ -152,6 +153,7 @@ const filterShellClassName =
 
 export function AssessmentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [industryFilter, setIndustryFilter] = useState("all");
@@ -237,8 +239,22 @@ export function AssessmentsPage() {
     () => groupAssessmentsByUser(filteredAssessments, sortKey, sortDirection),
     [filteredAssessments, sortDirection, sortKey],
   );
+  const highlightedAssessmentKey = getRouteSlug(searchParams.get("assessment") || "");
+  const highlightedAssessmentIndex = useMemo(
+    () =>
+      highlightedAssessmentKey
+        ? assessmentSummaries.findIndex((assessment) =>
+            isAssessmentHighlighted(assessment, highlightedAssessmentKey),
+          )
+        : -1,
+    [assessmentSummaries, highlightedAssessmentKey],
+  );
+  const highlightedAssessmentPage =
+    highlightedAssessmentIndex >= 0
+      ? Math.floor(highlightedAssessmentIndex / pageSize) + 1
+      : null;
   const pageCount = Math.max(1, Math.ceil(assessmentSummaries.length / pageSize));
-  const activePage = Math.min(page, pageCount);
+  const activePage = Math.min(highlightedAssessmentPage ?? page, pageCount);
   const firstRowIndex = assessmentSummaries.length ? (activePage - 1) * pageSize + 1 : 0;
   const lastRowIndex = Math.min(activePage * pageSize, assessmentSummaries.length);
   const hasActiveFilters =
@@ -319,7 +335,7 @@ export function AssessmentsPage() {
 
         <section className="mt-8 flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Assessments table">
         <div className="mb-3 rounded-md border border-[#E7EEF8] bg-[#F8FBFF] p-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="grid grid-cols-[minmax(180px,1.25fr)_minmax(128px,0.8fr)_minmax(118px,0.72fr)_minmax(84px,0.48fr)_minmax(124px,0.68fr)_18px_minmax(124px,0.68fr)_max-content] items-center gap-2">
             <SearchInput
               value={searchQuery}
               onChange={(value) => updateFilter(setSearchQuery, value)}
@@ -328,7 +344,7 @@ export function AssessmentsPage() {
               ariaLabel="Filter by industry"
               value={industryFilter}
               onChange={(value) => updateFilter(setIndustryFilter, value)}
-              className="sm:w-[184px]"
+              className="w-full"
             >
               <option value="all">All industries</option>
               {industryOptions.map((industry) => (
@@ -341,7 +357,7 @@ export function AssessmentsPage() {
               ariaLabel="Filter by status"
               value={statusFilter}
               onChange={(value) => updateFilter(setStatusFilter, value)}
-              className="sm:w-[164px]"
+              className="w-full"
             >
               <option value="all">All statuses</option>
               {statusOptions.map((status) => (
@@ -371,7 +387,7 @@ export function AssessmentsPage() {
               type="button"
               onClick={resetFilters}
               disabled={!hasActiveFilters}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#DCE8F8] bg-white px-3 text-sm font-bold text-[#555555] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-[#007AFF]/30 hover:text-[#007AFF] disabled:cursor-not-allowed disabled:text-[#A1A1AA] disabled:opacity-60"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-[#DCE8F8] bg-white px-3 text-sm font-bold text-[#555555] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-[#007AFF]/30 hover:text-[#007AFF] disabled:cursor-not-allowed disabled:text-[#A1A1AA] disabled:opacity-60"
               aria-label="Reset assessment filters"
             >
               <RotateCcw size={13} aria-hidden="true" />
@@ -442,6 +458,10 @@ export function AssessmentsPage() {
                       <AssessmentRow
                         key={assessment.id}
                         assessment={assessment}
+                        isHighlighted={isAssessmentHighlighted(
+                          assessment,
+                          highlightedAssessmentKey,
+                        )}
                         onOpen={() => openAssessment(assessment.id)}
                       />
                     ))
@@ -550,9 +570,11 @@ export function AssessmentDetailPage({
 
 function AssessmentRow({
   assessment,
+  isHighlighted,
   onOpen,
 }: {
   assessment: AssessmentSummary;
+  isHighlighted: boolean;
   onOpen: () => void;
 }) {
   const statusTone = getStatusTone(assessment.status, assessment.statusKey);
@@ -566,7 +588,11 @@ function AssessmentRow({
 
   return (
     <tr
-      className="h-[58px] cursor-pointer border-b border-black/[0.05] transition hover:bg-[#FAFAFA] focus:bg-[#FAFAFA] focus:outline-none last:border-b-0"
+      className={`h-[58px] cursor-pointer border-b border-black/[0.05] transition focus:outline-none last:border-b-0 ${
+        isHighlighted
+          ? "assessment-highlight-flash hover:bg-[#FAFAFA] focus:bg-[#FAFAFA]"
+          : "hover:bg-[#FAFAFA] focus:bg-[#FAFAFA]"
+      }`}
       onClick={onOpen}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -653,7 +679,7 @@ function SearchInput({
   value: string;
 }) {
   return (
-    <label className={`flex w-full items-center gap-2 px-3 sm:w-[320px] ${filterShellClassName}`}>
+    <label className={`flex min-w-0 items-center gap-2 px-3 ${filterShellClassName}`}>
       <Search size={13} className="text-[#A1A1AA]" aria-hidden="true" />
       <input
         aria-label="Search company, contact, or region"
@@ -681,7 +707,7 @@ function FilterSelect({
   value: string;
 }) {
   return (
-    <label className={`relative block w-full ${filterShellClassName} ${className}`}>
+    <label className={`relative block min-w-0 ${filterShellClassName} ${className}`}>
       <select
         aria-label={ariaLabel}
         value={value}
@@ -707,7 +733,7 @@ function MetricFilterInput({
   value: string;
 }) {
   return (
-    <label className={`flex w-full items-center gap-2 px-3 sm:w-[124px] ${filterShellClassName}`}>
+    <label className={`flex min-w-0 items-center gap-2 px-3 ${filterShellClassName}`}>
       <Percent size={13} className="text-[#007AFF]" aria-hidden="true" />
       <input
         aria-label="Minimum DI score"
@@ -731,7 +757,7 @@ function DateInput({
   value: string;
 }) {
   return (
-    <label className={`flex w-full items-center gap-2 px-3 sm:w-[154px] ${filterShellClassName}`}>
+    <label className={`flex min-w-0 items-center gap-2 px-3 ${filterShellClassName}`}>
       <CalendarDays size={13} className="text-[#007AFF]" aria-hidden="true" />
       <input
         aria-label={ariaLabel}
@@ -1177,6 +1203,7 @@ function AssessmentProcesses({ assessment }: { assessment: AssessmentSummary }) 
   const queryClient = useQueryClient();
   const [expandedProcessKey, setExpandedProcessKey] = useState("");
   const [processNotice, setProcessNotice] = useState("");
+  const customProcesses = assessment.customProcesses;
   const updateProcessMutation = useMutation({
     mutationFn: ({
       assessmentId,
@@ -1215,23 +1242,12 @@ function AssessmentProcesses({ assessment }: { assessment: AssessmentSummary }) 
     }
   }
 
-  return (
-    <section className="mt-6 overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between gap-3 border-b border-black/[0.08] px-5 py-4">
-        <p className="text-[10px] font-bold tracking-[0.14em] text-[#86868B] uppercase">
-          Selected processes ({formatNullableCount(assessment.processCount)})
-        </p>
-        {processNotice ? (
-          <p
-            className={`text-[11px] font-bold ${
-              updateProcessMutation.isError ? "text-[#EF4444]" : "text-[#10B981]"
-            }`}
-          >
-            {processNotice}
-          </p>
-        ) : null}
-      </div>
-
+  function renderProcessTable(
+    processes: AdminAssessmentProcess[],
+    sectionKey: string,
+    emptyMessage: string,
+  ) {
+    return (
       <div className="overflow-auto">
         <table className="w-full min-w-[920px] table-fixed border-collapse">
           <thead>
@@ -1246,18 +1262,18 @@ function AssessmentProcesses({ assessment }: { assessment: AssessmentSummary }) 
             </tr>
           </thead>
           <tbody>
-            {assessment.processes.length ? (
-              assessment.processes.map((process) => {
-                const processKey = getProcessKey(process);
-                const isExpanded = expandedProcessKey === processKey;
+            {processes.length ? (
+              processes.map((process) => {
+                const processSectionKey = getProcessSectionKey(sectionKey, process);
+                const isExpanded = expandedProcessKey === processSectionKey;
 
                 return (
-                  <Fragment key={processKey}>
+                  <Fragment key={processSectionKey}>
                     <ProcessRow
                       currencyConversionRate={assessment.currencyConversionRate}
                       expanded={isExpanded}
                       process={process}
-                      onToggle={() => setExpandedProcessKey(isExpanded ? "" : processKey)}
+                      onToggle={() => setExpandedProcessKey(isExpanded ? "" : processSectionKey)}
                     />
                     {isExpanded ? (
                       <tr>
@@ -1278,14 +1294,55 @@ function AssessmentProcesses({ assessment }: { assessment: AssessmentSummary }) 
             ) : (
               <tr>
                 <td colSpan={7} className="h-28 px-5 text-center text-sm font-semibold text-[#86868B]">
-                  Selected process details are not available for this assessment yet.
+                  {emptyMessage}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-    </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="mt-6 overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-3 border-b border-black/[0.08] px-5 py-4">
+          <p className="text-[10px] font-bold tracking-[0.14em] text-[#86868B] uppercase">
+            Selected processes ({formatNullableCount(assessment.processCount)})
+          </p>
+          {processNotice ? (
+            <p
+              className={`text-[11px] font-bold ${
+                updateProcessMutation.isError ? "text-[#EF4444]" : "text-[#10B981]"
+              }`}
+            >
+              {processNotice}
+            </p>
+          ) : null}
+        </div>
+        {renderProcessTable(
+          assessment.processes,
+          "selected",
+          "Selected process details are not available for this assessment yet.",
+        )}
+      </section>
+
+      {customProcesses.length ? (
+        <section className="mt-4 overflow-hidden rounded-md border border-black/[0.08] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+          <div className="flex items-center justify-between gap-3 border-b border-black/[0.08] px-5 py-4">
+            <p className="text-[10px] font-bold tracking-[0.14em] text-[#86868B] uppercase">
+              Custom processes ({customProcesses.length})
+            </p>
+          </div>
+          {renderProcessTable(
+            customProcesses,
+            "custom",
+            "Custom process details are not available for this assessment yet.",
+          )}
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -1875,6 +1932,10 @@ function createAssessmentSummary(id: string, rows: AdminAssessmentRow[]): Assess
     (industry) => industry !== "--",
   );
   const processes = getUniqueProcesses(rows.flatMap((row) => row.processes ?? []));
+  const customProcesses = getUniqueProcesses([
+    ...rows.flatMap((row) => row.customProcesses ?? []),
+    ...processes.filter(isFrontendCustomProcess),
+  ]);
   const explicitProcessCount = rows.reduce((sum, row) => sum + (row.processCount ?? 0), 0);
   const processCount = processes.length || explicitProcessCount || null;
 
@@ -1885,6 +1946,7 @@ function createAssessmentSummary(id: string, rows: AdminAssessmentRow[]): Assess
     cost: formatAedCurrency(sumMetric(rows.map((row) => row.cost))),
     createdAt: getEarliestDate(rows.map((row) => row.createdAt || row.updatedAt)),
     currencyConversionRate: getAssessmentCurrencyConversionRate(rows),
+    customProcesses,
     domain: getUniqueValues(rows.map((row) => row.domain)).join(", ") || "--",
     id,
     industry: getIndustrySummaryLabel(industries),
@@ -1916,6 +1978,34 @@ function getAssessmentGroupKey(row: AdminAssessmentRow) {
   return getRouteSlug(stableUserKey);
 }
 
+function isAssessmentHighlighted(assessment: AssessmentSummary, highlightKey: string) {
+  if (!highlightKey) {
+    return false;
+  }
+
+  return getAssessmentHighlightKeys(assessment).has(highlightKey);
+}
+
+function getAssessmentHighlightKeys(assessment: AssessmentSummary) {
+  return new Set(
+    [
+      assessment.id,
+      assessment.company,
+      assessment.contact,
+      getContactEmail(assessment.contact),
+      ...assessment.assessments.flatMap((row) => [
+        row.id,
+        row.company,
+        row.contact,
+        getContactEmail(row.contact),
+        getAssessmentGroupKey(row),
+      ]),
+    ]
+      .map((value) => getRouteSlug(String(value || "")))
+      .filter(Boolean),
+  );
+}
+
 function getIndustrySummaryLabel(industries: string[]) {
   if (!industries.length) {
     return "--";
@@ -1944,6 +2034,14 @@ function getUniqueProcesses(processes: AdminAssessmentProcess[]) {
 
 function getProcessKey(process: AdminAssessmentProcess) {
   return process.id || process.processId || normalizeSearch(process.name || "");
+}
+
+function getProcessSectionKey(sectionKey: string, process: AdminAssessmentProcess) {
+  return `${sectionKey}:${getProcessKey(process)}`;
+}
+
+function isFrontendCustomProcess(process: AdminAssessmentProcess) {
+  return String(process.source || "").trim().toLowerCase() === "industry-domain-custom";
 }
 
 function getAssessmentPreferences(rows: AdminAssessmentRow[]) {
