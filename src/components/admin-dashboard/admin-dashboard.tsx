@@ -70,7 +70,7 @@ const industryIconStyles: Record<string, { className: string; icon: LucideIcon; 
 export function AdminDashboard() {
   return (
     <AdminShell activeItem="Dashboard">
-      <div>
+      <div className="lg:pr-6">
         <header>
           <h1 className="text-[26px] leading-tight font-bold tracking-normal">Business Dashboard</h1>
           <p className="mt-2 text-sm font-semibold text-[#86868B]">

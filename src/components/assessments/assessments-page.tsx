@@ -300,7 +300,7 @@ export function AssessmentsPage() {
 
   return (
     <AdminShell activeItem="Assessments">
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden lg:pr-6">
         <header className="shrink-0 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-[26px] leading-tight font-bold tracking-normal">Assessments</h1>

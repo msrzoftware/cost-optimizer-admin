@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -11,6 +11,7 @@ export function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -69,19 +70,38 @@ export function LoginPage() {
               />
             </label>
 
-            <label className="block">
-              <span className="mb-2 block text-[11px] font-bold tracking-[0.12em] text-[#86868B] uppercase">
+            <div>
+              <label
+                className="mb-2 block text-[11px] font-bold tracking-[0.12em] text-[#86868B] uppercase"
+                htmlFor="admin-password"
+              >
                 Password
-              </span>
-              <input
-                autoComplete="current-password"
-                className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 text-sm font-semibold outline-none placeholder:text-[#A1A1AA] focus:border-[#007AFF]"
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter Your Password"
-                type="password"
-                value={password}
-              />
-            </label>
+              </label>
+              <div className="relative">
+                <input
+                  autoComplete="current-password"
+                  className="h-10 w-full rounded-md border border-black/[0.1] bg-white px-3 pr-10 text-sm font-semibold outline-none placeholder:text-[#A1A1AA] focus:border-[#007AFF]"
+                  id="admin-password"
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter Your Password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-[#86868B] transition hover:bg-black/[0.04] hover:text-[#171717]"
+                  onClick={() => setShowPassword((currentValue) => !currentValue)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} aria-hidden="true" />
+                  ) : (
+                    <Eye size={16} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+            </div>
 
             {formError || error ? (
               <p className="rounded-md bg-[#FEF2F2] px-3 py-2 text-xs font-semibold text-[#EF4444]">

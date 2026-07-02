@@ -804,7 +804,7 @@ export function DataDictionaryPage() {
 
   return (
     <AdminShell activeItem="Data Dictionary">
-      <div>
+      <div className="lg:pr-6">
         <PageHeader />
         <section className="mt-7 grid gap-5 xl:grid-cols-2" aria-label="Reference scales">
           <AutomationLevelsCard />
