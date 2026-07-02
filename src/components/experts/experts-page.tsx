@@ -53,7 +53,7 @@ const experts: Expert[] = [
 export function ExpertsPage() {
   return (
     <AdminShell activeItem="Experts">
-      <div>
+      <div className="lg:pr-6">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-[26px] leading-tight font-bold tracking-normal text-[#171717]">
